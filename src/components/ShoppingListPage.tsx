@@ -9,6 +9,7 @@ import FavoritesPage from './FavoritesPage';
 import PriceComparison from './PriceComparison';
 import SettingsPage from './SettingsPage';
 import AdminPanel from './AdminPanel';
+import PurchaseHistory from './PurchaseHistory';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -55,7 +56,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 
-type NavPage = 'lists' | 'budget' | 'favorites' | 'compare' | 'settings' | 'admin';
+type NavPage = 'lists' | 'budget' | 'favorites' | 'compare' | 'history' | 'settings' | 'admin';
 
 const categories = [
   { key: 'catFruits', value: 'fruits' },
@@ -84,6 +85,7 @@ export default function ShoppingListPage() {
     updateItem,
     logout,
     syncFromFirebase,
+    archiveList,
   } = useStore();
 
   const [activePage, setActivePage] = useState<NavPage>('lists');
@@ -173,6 +175,7 @@ export default function ShoppingListPage() {
     { key: 'budget', icon: <span className="text-lg">💰</span>, label: t('navBudget', language) },
     { key: 'favorites', icon: <span className="text-lg">⭐</span>, label: t('navFavorites', language) },
     { key: 'compare', icon: <span className="text-lg">🔍</span>, label: t('navCompare', language) },
+    { key: 'history', icon: <span className="text-lg">🕐</span>, label: t('navHistory', language) },
     { key: 'settings', icon: <span className="text-lg">⚙️</span>, label: t('navSettings', language) },
   ];
 
@@ -189,6 +192,8 @@ export default function ShoppingListPage() {
         return <FavoritesPage />;
       case 'compare':
         return <PriceComparison />;
+      case 'history':
+        return <PurchaseHistory />;
       case 'settings':
         return <SettingsPage />;
       case 'admin':
@@ -384,6 +389,23 @@ export default function ShoppingListPage() {
           placeholder={t('searchItems', language)}
           className="border-emerald-200/60 dark:border-emerald-800/40 focus-visible:ring-emerald-500/50 bg-white/60 dark:bg-gray-800/60 rounded-xl h-11 transition-all duration-300 focus:bg-white dark:focus:bg-gray-800"
         />
+
+        {/* Archive button — appears once every item is checked */}
+        {openList.items.length > 0 && openList.items.every((i) => i.checked) && (
+          <Button
+            onClick={async () => {
+              const ok = await archiveList(openList.id);
+              if (ok) {
+                setOpenListId(null);
+                setSearchQuery('');
+                setActivePage('history');
+              }
+            }}
+            className="gradient-emerald hover:opacity-90 text-white rounded-xl w-full shadow-emerald transition-all duration-300"
+          >
+            ✅ {t('archiveList', language)}
+          </Button>
+        )}
 
         {/* Add item form */}
         <Card className="border-emerald-200/40 dark:border-emerald-800/30 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm rounded-xl overflow-hidden">
@@ -758,6 +780,34 @@ export default function ShoppingListPage() {
               <Input
                 value={newListName}
                 onChange={(e) => setNewListName(e.target.value)}
+                placeholder={t('listName', language)}
+                className="mt-1.5 border-emerald-200/60 dark:border-emerald-800/40 focus-visible:ring-emerald-500/50 rounded-xl h-11"
+                onKeyDown={(e) => e.key === 'Enter' && handleCreateList()}
+                autoFocus
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowNewListDialog(false)} className="rounded-xl">
+              {t('cancel', language)}
+            </Button>
+            <Button
+              onClick={handleCreateList}
+              className="gradient-emerald hover:opacity-90 text-white rounded-xl"
+            >
+              {t('createList', language)}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+
+============================================
+
+)}
                 placeholder={t('listName', language)}
                 className="mt-1.5 border-emerald-200/60 dark:border-emerald-800/40 focus-visible:ring-emerald-500/50 rounded-xl h-11"
                 onKeyDown={(e) => e.key === 'Enter' && handleCreateList()}

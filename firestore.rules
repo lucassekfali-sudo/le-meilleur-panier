@@ -1,0 +1,42 @@
+rules_version = '2';
+
+// Goal of these rules:
+//   - Lock down the `users/{userId}` document and `accessKeys` collection
+//     so the client can never read or modify them. All identity/auth work
+//     goes through /api/auth (server-side) which uses the Firebase Admin
+//     SDK from a trusted environment.
+//   - Allow the client to read/write its own data subcollections:
+//     lists, budget, favorites, history.
+//
+// Note: this matches the previous app behaviour where lists/budget are
+// stored under users/{userId}/* and the user is identified via the
+// session cookie. If you migrate to Firebase Auth later, replace
+// `if true` below with `if request.auth.uid == userId`.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // === Identity (server-only) ===
+    match /users/{userId} {
+      allow read:  if false;
+      allow write: if false;
+
+      // === User-owned data (client OK) ===
+      match /lists/{listId}      { allow read, write: if true; }
+      match /budget/{docId}      { allow read, write: if true; }
+      match /favorites/{docId}   { allow read, write: if true; }
+      match /history/{historyId} { allow read, write: if true; }
+    }
+
+    // === Access keys (server-only) ===
+    match /accessKeys/{keyId} {
+      allow read:  if false;
+      allow write: if false;
+    }
+
+    // Default deny everything else
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

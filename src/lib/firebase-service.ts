@@ -9,20 +9,29 @@ import {
   updateDoc,
   query,
   where,
+  orderBy,
+  limit as fsLimit,
   Timestamp,
 } from 'firebase/firestore';
 
-// Types
+// ========== Types ==========
+
 export interface UserData {
   id: string;
   email: string;
   name: string;
-  password: string;
+  /** Hashed password (scrypt:salt:hash). Always prefer this. */
+  passwordHash?: string;
+  /** Legacy plaintext field — only present on accounts not yet migrated. */
+  password?: string;
   language: string;
   createdAt: string;
   lastLogin: string;
   accessKey?: string;
 }
+
+/** Exposed user shape (no password material). */
+export type SafeUserData = Omit<UserData, 'password' | 'passwordHash'>;
 
 export interface ShoppingListData {
   id: string;
@@ -67,6 +76,19 @@ export interface AccessKeyData {
   active: boolean;
 }
 
+/** A snapshot of a completed shopping list, archived for history. */
+export interface PurchaseHistoryEntry {
+  id: string;
+  listId: string;
+  listName: string;
+  items: ShoppingItemData[];
+  total: number;
+  itemsCount: number;
+  checkedCount: number;
+  store?: string;
+  archivedAt: string;
+}
+
 // Default access keys to seed
 const DEFAULT_ACCESS_KEYS = [
   'RI8ZJB6BXB',
@@ -76,11 +98,8 @@ const DEFAULT_ACCESS_KEYS = [
   'AW1CT3XUVW',
 ];
 
-// Check if Firestore is available
 function getDb() {
-  if (!db || !isFirebaseConfigured()) {
-    return null;
-  }
+  if (!db || !isFirebaseConfigured()) return null;
   return db;
 }
 
@@ -93,10 +112,8 @@ export async function initializeFirebase(): Promise<void> {
   if (!firestore || initialized) return;
 
   try {
-    // Check if access keys are already seeded
     const keysSnapshot = await getDocs(collection(firestore, 'accessKeys'));
     if (keysSnapshot.empty) {
-      // Seed default access keys
       console.log('[Firebase] Seeding default access keys...');
       for (const key of DEFAULT_ACCESS_KEYS) {
         await setDoc(doc(firestore, 'accessKeys', key), {
@@ -116,17 +133,39 @@ export async function initializeFirebase(): Promise<void> {
 
 // ========== User Operations ==========
 
+/**
+ * @deprecated stores plaintext password — kept only for backwards compatibility
+ * with old client paths. New code MUST use createUserWithHash via /api/auth.
+ */
 export async function createUser(
   email: string,
   name: string,
   password: string,
   accessKey: string
 ): Promise<UserData | null> {
+  console.warn('[Firebase] createUser called with plaintext password — use createUserWithHash instead');
+  return createUserInternal(email, name, accessKey, { password });
+}
+
+export async function createUserWithHash(
+  email: string,
+  name: string,
+  passwordHash: string,
+  accessKey: string
+): Promise<UserData | null> {
+  return createUserInternal(email, name, accessKey, { passwordHash });
+}
+
+async function createUserInternal(
+  email: string,
+  name: string,
+  accessKey: string,
+  pw: { password?: string; passwordHash?: string }
+): Promise<UserData | null> {
   const firestore = getDb();
   if (!firestore) return null;
 
   try {
-    // Check if user already exists
     const existingUser = await getUserByEmail(email);
     if (existingUser) {
       console.warn('[Firebase] User already exists:', email);
@@ -138,7 +177,8 @@ export async function createUser(
       id: userId,
       email,
       name,
-      password,
+      ...(pw.passwordHash ? { passwordHash: pw.passwordHash } : {}),
+      ...(pw.password ? { password: pw.password } : {}),
       language: 'fr',
       createdAt: new Date().toISOString(),
       lastLogin: new Date().toISOString(),
@@ -146,8 +186,6 @@ export async function createUser(
     };
 
     await setDoc(doc(firestore, 'users', userId), userData);
-
-    // Mark the access key as used
     await markAccessKeyAsUsed(accessKey, userId, email);
 
     console.log('[Firebase] User created:', email);
@@ -158,17 +196,12 @@ export async function createUser(
   }
 }
 
-export async function getUserByEmail(
-  email: string
-): Promise<UserData | null> {
+export async function getUserByEmail(email: string): Promise<UserData | null> {
   const firestore = getDb();
   if (!firestore) return null;
 
   try {
-    const q = query(
-      collection(firestore, 'users'),
-      where('email', '==', email)
-    );
+    const q = query(collection(firestore, 'users'), where('email', '==', email));
     const snapshot = await getDocs(q);
     if (!snapshot.empty) {
       return snapshot.docs[0].data() as UserData;
@@ -180,17 +213,13 @@ export async function getUserByEmail(
   }
 }
 
-export async function getUserById(
-  userId: string
-): Promise<UserData | null> {
+export async function getUserById(userId: string): Promise<UserData | null> {
   const firestore = getDb();
   if (!firestore) return null;
 
   try {
     const docSnap = await getDoc(doc(firestore, 'users', userId));
-    if (docSnap.exists()) {
-      return docSnap.data() as UserData;
-    }
+    if (docSnap.exists()) return docSnap.data() as UserData;
     return null;
   } catch (error) {
     console.error('[Firebase] Error getting user by ID:', error);
@@ -198,9 +227,7 @@ export async function getUserById(
   }
 }
 
-export async function updateUserLastLogin(
-  userId: string
-): Promise<void> {
+export async function updateUserLastLogin(userId: string): Promise<void> {
   const firestore = getDb();
   if (!firestore) return;
 
@@ -213,13 +240,42 @@ export async function updateUserLastLogin(
   }
 }
 
-export async function getAllUsers(): Promise<UserData[]> {
+/**
+ * Sets the scrypt password hash for a user and clears any legacy plaintext field.
+ * Used for password migration after a successful login with a legacy account.
+ */
+export async function updateUserPasswordHash(
+  userId: string,
+  passwordHash: string
+): Promise<void> {
+  const firestore = getDb();
+  if (!firestore) return;
+
+  try {
+    // updateDoc with field deletion: write null then re-write hash; for simplicity
+    // we just set the hash and overwrite the legacy field with empty string.
+    await updateDoc(doc(firestore, 'users', userId), {
+      passwordHash,
+      password: '', // clear legacy plaintext
+    });
+  } catch (error) {
+    console.error('[Firebase] Error updating password hash:', error);
+  }
+}
+
+/** Returns users without ANY password material. */
+export async function getAllUsers(): Promise<SafeUserData[]> {
   const firestore = getDb();
   if (!firestore) return [];
 
   try {
     const snapshot = await getDocs(collection(firestore, 'users'));
-    return snapshot.docs.map((d) => d.data() as UserData);
+    return snapshot.docs.map((d) => {
+      const data = d.data() as UserData;
+      const { password: _p, passwordHash: _h, ...safe } = data;
+      void _p; void _h;
+      return safe as SafeUserData;
+    });
   } catch (error) {
     console.error('[Firebase] Error getting all users:', error);
     return [];
@@ -236,10 +292,13 @@ export async function deleteUser(userId: string): Promise<void> {
     for (const listDoc of listsSnapshot.docs) {
       await deleteDoc(listDoc.ref);
     }
+    const historySnap = await getDocs(collection(firestore, 'users', userId, 'history'));
+    for (const h of historySnap.docs) {
+      await deleteDoc(h.ref);
+    }
     await deleteDoc(doc(firestore, 'users', userId, 'budget', 'current'));
     await deleteDoc(doc(firestore, 'users', userId, 'favorites', 'items'));
 
-    // Delete user document
     await deleteDoc(doc(firestore, 'users', userId));
     console.log('[Firebase] User deleted:', userId);
   } catch (error) {
@@ -257,13 +316,10 @@ export async function saveShoppingList(
   if (!firestore) return;
 
   try {
-    await setDoc(
-      doc(firestore, 'users', userId, 'lists', list.id),
-      {
-        ...list,
-        updatedAt: new Date().toISOString(),
-      }
-    );
+    await setDoc(doc(firestore, 'users', userId, 'lists', list.id), {
+      ...list,
+      updatedAt: new Date().toISOString(),
+    });
   } catch (error) {
     console.error('[Firebase] Error saving shopping list:', error);
   }
@@ -302,13 +358,9 @@ export async function deleteShoppingList(
 
 // ========== Budget Operations ==========
 
-export async function saveBudget(
-  userId: string,
-  budget: BudgetData
-): Promise<void> {
+export async function saveBudget(userId: string, budget: BudgetData): Promise<void> {
   const firestore = getDb();
   if (!firestore) return;
-
   try {
     await setDoc(doc(firestore, 'users', userId, 'budget', 'current'), budget);
   } catch (error) {
@@ -316,19 +368,12 @@ export async function saveBudget(
   }
 }
 
-export async function getBudget(
-  userId: string
-): Promise<BudgetData | null> {
+export async function getBudget(userId: string): Promise<BudgetData | null> {
   const firestore = getDb();
   if (!firestore) return null;
-
   try {
-    const docSnap = await getDoc(
-      doc(firestore, 'users', userId, 'budget', 'current')
-    );
-    if (docSnap.exists()) {
-      return docSnap.data() as BudgetData;
-    }
+    const docSnap = await getDoc(doc(firestore, 'users', userId, 'budget', 'current'));
+    if (docSnap.exists()) return docSnap.data() as BudgetData;
     return null;
   } catch (error) {
     console.error('[Firebase] Error getting budget:', error);
@@ -338,22 +383,27 @@ export async function getBudget(
 
 // ========== Access Key Operations ==========
 
-export async function validateAccessKey(
-  key: string
-): Promise<boolean> {
+/**
+ * Validate an access key for signup.
+ * Fail-CLOSED: returns false on Firebase errors so a misconfigured backend
+ * can't accidentally let everyone sign up.
+ */
+export async function validateAccessKey(key: string): Promise<boolean> {
   const firestore = getDb();
-  if (!firestore) return true; // If no Firebase, allow access
+  if (!firestore) {
+    // No Firebase configured — refuse signup. The previous behaviour
+    // (return true) was a critical bypass.
+    return false;
+  }
 
   try {
     const docSnap = await getDoc(doc(firestore, 'accessKeys', key));
-    if (docSnap.exists()) {
-      const data = docSnap.data() as AccessKeyData;
-      return data.active && !data.usedBy;
-    }
-    return false;
+    if (!docSnap.exists()) return false;
+    const data = docSnap.data() as AccessKeyData;
+    return data.active === true && !data.usedBy;
   } catch (error) {
     console.error('[Firebase] Error validating access key:', error);
-    return true; // Fallback: allow access if Firebase errors
+    return false; // fail closed
   }
 }
 
@@ -390,9 +440,7 @@ export async function getAccessKeys(): Promise<AccessKeyData[]> {
   }
 }
 
-export async function createAccessKey(
-  key: string
-): Promise<void> {
+export async function createAccessKey(key: string): Promise<void> {
   const firestore = getDb();
   if (!firestore) return;
 
@@ -426,9 +474,7 @@ export async function saveFavorites(
   }
 }
 
-export async function getFavorites(
-  userId: string
-): Promise<ShoppingItemData[]> {
+export async function getFavorites(userId: string): Promise<ShoppingItemData[]> {
   const firestore = getDb();
   if (!firestore) return [];
 
@@ -447,7 +493,93 @@ export async function getFavorites(
   }
 }
 
-// ========== Helper: Timestamp conversion ==========
+// ========== Purchase History Operations ==========
+
+/**
+ * Archive a completed shopping list to the user's purchase history.
+ * Returns the created entry (or null on error).
+ */
+export async function archiveListToHistory(
+  userId: string,
+  list: ShoppingListData,
+  store?: string
+): Promise<PurchaseHistoryEntry | null> {
+  const firestore = getDb();
+  if (!firestore) return null;
+
+  try {
+    const total = list.items.reduce((sum, i) => sum + i.price * i.quantity, 0);
+    const checkedCount = list.items.filter((i) => i.checked).length;
+    const id = 'hist_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
+
+    const entry: PurchaseHistoryEntry = {
+      id,
+      listId: list.id,
+      listName: list.name,
+      items: list.items,
+      total,
+      itemsCount: list.items.length,
+      checkedCount,
+      store: store || undefined,
+      archivedAt: new Date().toISOString(),
+    };
+
+    await setDoc(doc(firestore, 'users', userId, 'history', id), entry);
+    return entry;
+  } catch (error) {
+    console.error('[Firebase] Error archiving list to history:', error);
+    return null;
+  }
+}
+
+/**
+ * Read purchase history, sorted by archived date desc.
+ * @param max Optional cap on number of entries (defaults to 100)
+ */
+export async function getPurchaseHistory(
+  userId: string,
+  max = 100
+): Promise<PurchaseHistoryEntry[]> {
+  const firestore = getDb();
+  if (!firestore) return [];
+
+  try {
+    const q = query(
+      collection(firestore, 'users', userId, 'history'),
+      orderBy('archivedAt', 'desc'),
+      fsLimit(max)
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((d) => d.data() as PurchaseHistoryEntry);
+  } catch (error) {
+    // Fallback without orderBy in case the index isn't ready yet
+    try {
+      const snapshot = await getDocs(collection(firestore, 'users', userId, 'history'));
+      const all = snapshot.docs.map((d) => d.data() as PurchaseHistoryEntry);
+      all.sort((a, b) => (a.archivedAt < b.archivedAt ? 1 : -1));
+      return all.slice(0, max);
+    } catch (fallbackError) {
+      console.error('[Firebase] Error getting purchase history:', error, fallbackError);
+      return [];
+    }
+  }
+}
+
+export async function deleteHistoryEntry(
+  userId: string,
+  historyId: string
+): Promise<void> {
+  const firestore = getDb();
+  if (!firestore) return;
+
+  try {
+    await deleteDoc(doc(firestore, 'users', userId, 'history', historyId));
+  } catch (error) {
+    console.error('[Firebase] Error deleting history entry:', error);
+  }
+}
+
+// ========== Helper ==========
 export function timestampToDate(ts: Timestamp | string): string {
   if (typeof ts === 'string') return ts;
   return ts.toDate().toISOString();

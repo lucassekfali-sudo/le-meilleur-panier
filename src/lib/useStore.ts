@@ -5,31 +5,21 @@ import { persist } from 'zustand/middleware';
 import { Language } from './translations';
 import { isFirebaseConfigured } from './firebase';
 import type {
-  UserData,
   ShoppingListData,
   ShoppingItemData,
   BudgetData,
   AccessKeyData,
+  PurchaseHistoryEntry,
 } from './firebase-service';
 
-// Default access keys
-const DEFAULT_ACCESS_KEYS: AccessKeyData[] = [
-  { key: 'RI8ZJB6BXB', usedBy: null, usedAt: null, active: true },
-  { key: 'M9LHZOCN0P', usedBy: null, usedAt: null, active: true },
-  { key: '11UHOUCF2L', usedBy: null, usedAt: null, active: true },
-  { key: '4D7VKCXVYN', usedBy: null, usedAt: null, active: true },
-  { key: 'AW1CT3XUVW', usedBy: null, usedAt: null, active: true },
-];
-
-// Admin credentials
-const ADMIN_EMAIL = 'admin@gmail.com';
-const ADMIN_KEY = 'B5DLLK3Y9F';
+// NOTE: ADMIN_EMAIL, ADMIN_KEY and DEFAULT_ACCESS_KEYS used to be hardcoded
+// here. They're now server-only (env + Firestore). Anything secret stays
+// behind the /api/auth boundary.
 
 export interface AppUser {
   id: string;
   email: string;
   name: string;
-  password?: string;
   language: string;
   createdAt: string;
   lastLogin: string;
@@ -68,38 +58,44 @@ export interface AppAccessKey {
 }
 
 interface AppState {
-  // Auth
   user: AppUser | null;
   isAdmin: boolean;
 
-  // Shopping
   shoppingLists: AppShoppingList[];
   favorites: AppShoppingItem[];
 
-  // Budget
   budget: AppBudget;
 
-  // Settings
   language: Language;
   theme: 'light' | 'dark';
 
-  // Admin data
   allUsers: AppUser[];
   accessKeys: AppAccessKey[];
 
-  // Tutorial
+  /** Not persisted in localStorage — always reloaded from Firebase on login. */
+  purchaseHistory: PurchaseHistoryEntry[];
+
   showTutorial: boolean;
 
-  // Firebase status
+  /** Last error message returned by /api/auth (for UI display). */
+  authError: string | null;
+
   firebaseAvailable: boolean;
   firebaseInitialized: boolean;
 }
 
 interface AppActions {
-  // Auth
+  // Auth (all server-routed)
   login: (email: string, password: string) => Promise<boolean>;
-  signup: (email: string, name: string, password: string, accessKey: string) => Promise<boolean>;
-  adminLogin: (email: string, code: string) => boolean;
+  signup: (
+    email: string,
+    name: string,
+    password: string,
+    accessKey: string
+  ) => Promise<boolean>;
+  /** Kept for backwards compatibility — admin login flows through the same /api/auth route. */
+  adminLogin: (email: string, code: string) => Promise<boolean>;
+  setAuthError: (e: string | null) => void;
   logout: () => void;
 
   // Shopping Lists
@@ -131,14 +127,44 @@ interface AppActions {
   syncFromFirebase: () => Promise<void>;
   initFirebase: () => Promise<void>;
 
+  // Purchase history
+  archiveList: (listId: string, store?: string) => Promise<boolean>;
+  loadPurchaseHistory: () => Promise<void>;
+  deleteHistoryEntry: (historyId: string) => Promise<void>;
+
   // Tutorial
   dismissTutorial: () => void;
+}
+
+interface AuthResponse {
+  user?: AppUser;
+  isAdmin?: boolean;
+  accessKeys?: AccessKeyData[];
+  error?: string;
+}
+
+async function callAuth(payload: Record<string, unknown>): Promise<AuthResponse> {
+  try {
+    const res = await fetch('/api/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = (await res.json().catch(() => ({}))) as AuthResponse;
+    if (!res.ok) {
+      return { error: data.error || 'Erreur de connexion' };
+    }
+    return data;
+  } catch (e) {
+    console.warn('[Store] /api/auth network error:', e);
+    return { error: 'Erreur réseau' };
+  }
 }
 
 export const useStore = create<AppState & AppActions>()(
   persist(
     (set, get) => ({
-      // Initial State
+      // ----- Initial state -----
       user: null,
       isAdmin: false,
       shoppingLists: [],
@@ -152,12 +178,16 @@ export const useStore = create<AppState & AppActions>()(
       language: 'fr' as Language,
       theme: 'light' as const,
       allUsers: [],
-      accessKeys: DEFAULT_ACCESS_KEYS,
+      accessKeys: [],
+      purchaseHistory: [],
       showTutorial: false,
+      authError: null,
       firebaseAvailable: isFirebaseConfigured(),
       firebaseInitialized: false,
 
-      // Initialize Firebase
+      setAuthError: (e) => set({ authError: e }),
+
+      // ----- Firebase init -----
       initFirebase: async () => {
         if (!isFirebaseConfigured() || get().firebaseInitialized) return;
         try {
@@ -165,7 +195,6 @@ export const useStore = create<AppState & AppActions>()(
           await fbService.initializeFirebase();
           set({ firebaseInitialized: true });
 
-          // Load access keys from Firebase
           const fbKeys = await fbService.getAccessKeys();
           if (fbKeys.length > 0) {
             set({ accessKeys: fbKeys as AppAccessKey[] });
@@ -175,206 +204,55 @@ export const useStore = create<AppState & AppActions>()(
         }
       },
 
-      // Auth Actions
-      login: async (email: string, password: string) => {
-        // Check admin login
-        if (email === ADMIN_EMAIL && password === ADMIN_KEY) {
-          const adminUser: AppUser = {
-            id: 'admin',
-            email: ADMIN_EMAIL,
-            name: 'Admin',
-            language: get().language,
-            createdAt: new Date().toISOString(),
-            lastLogin: new Date().toISOString(),
-          };
-          set({ user: adminUser, isAdmin: true, showTutorial: false });
-          return true;
-        }
-
-        // Try Firebase first
-        if (isFirebaseConfigured()) {
-          try {
-            const fbService = await import('./firebase-service');
-            const fbUser = await fbService.getUserByEmail(email);
-            if (fbUser) {
-              // Verify the password matches
-              if (fbUser.password !== password) {
-                return false;
-              }
-              const appUser: AppUser = {
-                id: fbUser.id,
-                email: fbUser.email,
-                name: fbUser.name,
-                language: fbUser.language || 'fr',
-                createdAt: fbUser.createdAt,
-                lastLogin: new Date().toISOString(),
-                accessKey: fbUser.accessKey,
-              };
-
-              // Update last login in Firebase
-              await fbService.updateUserLastLogin(fbUser.id);
-
-              // Load user data from Firebase
-              set({ user: appUser, isAdmin: false });
-
-              // Sync user data from Firebase
-              const [fbLists, fbBudget, fbFavorites] = await Promise.all([
-                fbService.getShoppingLists(fbUser.id),
-                fbService.getBudget(fbUser.id),
-                fbService.getFavorites(fbUser.id),
-              ]);
-
-              const updates: Partial<AppState> = {};
-              if (fbLists.length > 0) {
-                updates.shoppingLists = fbLists as AppShoppingList[];
-              }
-              if (fbBudget) {
-                updates.budget = fbBudget as AppBudget;
-              }
-              if (fbFavorites.length > 0) {
-                updates.favorites = fbFavorites as AppShoppingItem[];
-              }
-              if (Object.keys(updates).length > 0) {
-                set(updates as any);
-              }
-
-              console.log('[Store] Login via Firebase successful:', email);
-              return true;
-            }
-          } catch (e) {
-            console.warn('[Store] Firebase login error, trying local:', e);
-          }
-        }
-
-        // Fallback: check local users
-        const storedUsers = getFromLocalStorage<AppUser[]>('lmp_users') || [];
-        const foundUser = storedUsers.find((u) => u.email === email);
-
-        if (foundUser) {
-          const userKeys = getFromLocalStorage<{ email: string; key: string }[]>('lmp_user_keys') || [];
-          const userKey = userKeys.find((uk) => uk.email === email);
-          // For backwards compat: check password OR access key
-          if (foundUser.password === password || (userKey && userKey.key === password)) {
-            foundUser.lastLogin = new Date().toISOString();
-            const updatedUsers = storedUsers.map((u) =>
-              u.email === email ? foundUser : u
-            );
-            saveToLocalStorage('lmp_users', updatedUsers);
-            set({ user: foundUser, isAdmin: false });
-            return true;
-          }
-        }
-
-        return false;
-      },
-
-      signup: async (email: string, name: string, password: string, accessKey: string) => {
-        // Validate access key
-        if (isFirebaseConfigured()) {
-          try {
-            const fbService = await import('./firebase-service');
-            const keyValid = await fbService.validateAccessKey(accessKey);
-            if (!keyValid) {
-              return false;
-            }
-
-            // Check if user already exists in Firebase
-            const existingUser = await fbService.getUserByEmail(email);
-            if (existingUser) {
-              return false;
-            }
-
-            // Create user in Firebase
-            const fbUser = await fbService.createUser(email, name, password, accessKey);
-            if (fbUser) {
-              const appUser: AppUser = {
-                id: fbUser.id,
-                email: fbUser.email,
-                name: fbUser.name,
-                language: fbUser.language || get().language,
-                createdAt: fbUser.createdAt,
-                lastLogin: fbUser.lastLogin,
-                accessKey: fbUser.accessKey,
-              };
-
-              // Reload keys from Firebase to reflect used state
-              const fbKeys = await fbService.getAccessKeys();
-
-              set({
-                user: appUser,
-                isAdmin: false,
-                accessKeys: fbKeys.length > 0 ? (fbKeys as AppAccessKey[]) : get().accessKeys,
-                showTutorial: true,
-              });
-
-              console.log('[Store] Signup via Firebase successful:', email);
-              return true;
-            }
-          } catch (e) {
-            console.warn('[Store] Firebase signup error, trying local:', e);
-          }
-        }
-
-        // Fallback: local validation
-        const keys = get().accessKeys;
-        const validKey = keys.find((k) => k.key === accessKey && k.active && !k.usedBy);
-        if (!validKey) {
+      // ----- Auth -----
+      login: async (email, password) => {
+        set({ authError: null });
+        const data = await callAuth({ action: 'login', email, password });
+        if (data.error || !data.user) {
+          set({ authError: data.error ?? 'Identifiants invalides' });
           return false;
         }
-
-        const storedUsers = getFromLocalStorage<AppUser[]>('lmp_users') || [];
-        if (storedUsers.find((u) => u.email === email)) {
-          return false;
-        }
-
-        const newUser: AppUser = {
-          id: email.replace(/[^a-zA-Z0-9]/g, '_') + '_' + Date.now(),
-          email,
-          name,
-          password,
-          language: get().language,
-          createdAt: new Date().toISOString(),
-          lastLogin: new Date().toISOString(),
-          accessKey,
-        };
-
-        const updatedKeys = keys.map((k) =>
-          k.key === accessKey
-            ? { ...k, usedBy: newUser.id, usedAt: new Date().toISOString(), active: false }
-            : k
-        );
-
-        storedUsers.push(newUser);
-        saveToLocalStorage('lmp_users', storedUsers);
-
-        const userKeys = getFromLocalStorage<{ email: string; key: string }[]>('lmp_user_keys') || [];
-        userKeys.push({ email, key: accessKey });
-        saveToLocalStorage('lmp_user_keys', userKeys);
-
         set({
-          user: newUser,
-          isAdmin: false,
-          accessKeys: updatedKeys,
-          showTutorial: true,
+          user: data.user,
+          isAdmin: !!data.isAdmin,
+          showTutorial: false,
+          authError: null,
         });
 
+        // Background data load (non-fatal if it fails)
+        if (!data.isAdmin && isFirebaseConfigured()) {
+          try {
+            await get().syncFromFirebase();
+            await get().loadPurchaseHistory();
+          } catch (e) {
+            console.warn('[Store] Post-login sync error:', e);
+          }
+        }
         return true;
       },
 
-      adminLogin: (email: string, code: string) => {
-        if (email === ADMIN_EMAIL && code === ADMIN_KEY) {
-          const adminUser: AppUser = {
-            id: 'admin',
-            email: ADMIN_EMAIL,
-            name: 'Admin',
-            language: get().language,
-            createdAt: new Date().toISOString(),
-            lastLogin: new Date().toISOString(),
-          };
-          set({ user: adminUser, isAdmin: true, showTutorial: false });
-          return true;
+      signup: async (email, name, password, accessKey) => {
+        set({ authError: null });
+        const data = await callAuth({ action: 'signup', email, name, password, accessKey });
+        if (data.error || !data.user) {
+          set({ authError: data.error ?? 'Échec de la création du compte' });
+          return false;
         }
-        return false;
+        set({
+          user: data.user,
+          isAdmin: false,
+          showTutorial: true,
+          accessKeys: data.accessKeys
+            ? (data.accessKeys as AppAccessKey[])
+            : get().accessKeys,
+          authError: null,
+        });
+        return true;
+      },
+
+      adminLogin: async (email, code) => {
+        // Admin uses the same /api/auth route — code is the admin password.
+        return get().login(email, code);
       },
 
       logout: () => {
@@ -389,12 +267,13 @@ export const useStore = create<AppState & AppActions>()(
             variableExpenses: [],
             foodBudget: 0,
           },
+          purchaseHistory: [],
           showTutorial: false,
         });
       },
 
-      // Shopping List Actions
-      addList: (name: string) => {
+      // ----- Shopping list mutations -----
+      addList: (name) => {
         const newList: AppShoppingList = {
           id: 'list_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9),
           name,
@@ -402,25 +281,22 @@ export const useStore = create<AppState & AppActions>()(
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
-        set((state) => ({
-          shoppingLists: [...state.shoppingLists, newList],
-        }));
+        set((state) => ({ shoppingLists: [...state.shoppingLists, newList] }));
         get().syncToFirebase();
       },
 
-      deleteList: (listId: string) => {
+      deleteList: (listId) => {
         set((state) => ({
           shoppingLists: state.shoppingLists.filter((l) => l.id !== listId),
         }));
-        // Also delete from Firebase
         if (isFirebaseConfigured() && get().user) {
-          import('./firebase-service').then((fbService) => {
-            fbService.deleteShoppingList(get().user!.id, listId);
-          }).catch(console.error);
+          import('./firebase-service')
+            .then((fb) => fb.deleteShoppingList(get().user!.id, listId))
+            .catch(console.error);
         }
       },
 
-      addItem: (listId: string, item: AppShoppingItem) => {
+      addItem: (listId, item) => {
         set((state) => ({
           shoppingLists: state.shoppingLists.map((l) =>
             l.id === listId
@@ -431,7 +307,7 @@ export const useStore = create<AppState & AppActions>()(
         get().syncToFirebase();
       },
 
-      removeItem: (listId: string, itemId: string) => {
+      removeItem: (listId, itemId) => {
         set((state) => ({
           shoppingLists: state.shoppingLists.map((l) =>
             l.id === listId
@@ -446,7 +322,7 @@ export const useStore = create<AppState & AppActions>()(
         get().syncToFirebase();
       },
 
-      toggleItem: (listId: string, itemId: string) => {
+      toggleItem: (listId, itemId) => {
         set((state) => ({
           shoppingLists: state.shoppingLists.map((l) =>
             l.id === listId
@@ -463,7 +339,7 @@ export const useStore = create<AppState & AppActions>()(
         get().syncToFirebase();
       },
 
-      updateItem: (listId: string, itemId: string, updates: Partial<AppShoppingItem>) => {
+      updateItem: (listId, itemId, updates) => {
         set((state) => ({
           shoppingLists: state.shoppingLists.map((l) =>
             l.id === listId
@@ -480,127 +356,89 @@ export const useStore = create<AppState & AppActions>()(
         get().syncToFirebase();
       },
 
-      // Favorites Actions
-      addFavorite: (item: AppShoppingItem) => {
-        set((state) => ({
-          favorites: [...state.favorites, item],
-        }));
+      // ----- Favorites -----
+      addFavorite: (item) => {
+        set((state) => ({ favorites: [...state.favorites, item] }));
         get().syncToFirebase();
       },
-
-      removeFavorite: (itemId: string) => {
+      removeFavorite: (itemId) => {
         set((state) => ({
           favorites: state.favorites.filter((i) => i.id !== itemId),
         }));
         get().syncToFirebase();
       },
 
-      // Budget Actions
-      saveBudget: (budget: AppBudget) => {
+      // ----- Budget -----
+      saveBudget: (budget) => {
         set({ budget });
         get().syncToFirebase();
       },
 
-      // Settings Actions
-      setLanguage: (lang: Language) => {
-        set({ language: lang });
-      },
-
-      setTheme: (theme: 'light' | 'dark') => {
+      // ----- Settings -----
+      setLanguage: (lang) => set({ language: lang }),
+      setTheme: (theme) => {
         set({ theme });
         if (typeof document !== 'undefined') {
           document.documentElement.classList.toggle('dark', theme === 'dark');
         }
       },
 
-      // Admin Actions
+      // ----- Admin -----
       loadAdminData: async () => {
         if (!get().isAdmin) return;
 
-        if (isFirebaseConfigured()) {
-          try {
-            const fbService = await import('./firebase-service');
-            const [fbUsers, fbKeys] = await Promise.all([
-              fbService.getAllUsers(),
-              fbService.getAccessKeys(),
-            ]);
-
-            set({
-              allUsers: fbUsers as AppUser[],
-              accessKeys: fbKeys.length > 0 ? (fbKeys as AppAccessKey[]) : get().accessKeys,
-            });
-
-            console.log('[Store] Admin data loaded from Firebase:', fbUsers.length, 'users,', fbKeys.length, 'keys');
-            return;
-          } catch (e) {
-            console.warn('[Store] Firebase admin load error, trying local:', e);
-          }
-        }
-
-        // Fallback: load local users
-        const localUsers = getFromLocalStorage<AppUser[]>('lmp_users') || [];
-        set({ allUsers: localUsers });
-      },
-
-      createAccessKey: (key: string) => {
-        const newKey: AppAccessKey = {
-          key,
-          usedBy: null,
-          usedAt: null,
-          active: true,
-        };
-        set((state) => ({
-          accessKeys: [...state.accessKeys, newKey],
-        }));
-
-        // Sync to Firebase
-        if (isFirebaseConfigured()) {
-          import('./firebase-service').then((fbService) => {
-            fbService.createAccessKey(key);
-          }).catch(console.error);
+        if (!isFirebaseConfigured()) return;
+        try {
+          const fbService = await import('./firebase-service');
+          const [fbUsers, fbKeys] = await Promise.all([
+            fbService.getAllUsers(),
+            fbService.getAccessKeys(),
+          ]);
+          set({
+            allUsers: fbUsers as unknown as AppUser[],
+            accessKeys: fbKeys.length > 0 ? (fbKeys as AppAccessKey[]) : get().accessKeys,
+          });
+          console.log('[Store] Admin data loaded:', fbUsers.length, 'users,', fbKeys.length, 'keys');
+        } catch (e) {
+          console.warn('[Store] Admin load error:', e);
         }
       },
 
-      deleteUser: async (userId: string) => {
-        // Delete from Firebase
+      createAccessKey: (key) => {
+        const newKey: AppAccessKey = { key, usedBy: null, usedAt: null, active: true };
+        set((state) => ({ accessKeys: [...state.accessKeys, newKey] }));
+
         if (isFirebaseConfigured()) {
-          try {
-            const fbService = await import('./firebase-service');
-            await fbService.deleteUser(userId);
-
-            // Reload admin data
-            await get().loadAdminData();
-            return;
-          } catch (e) {
-            console.warn('[Store] Firebase delete user error:', e);
-          }
+          import('./firebase-service')
+            .then((fb) => fb.createAccessKey(key))
+            .catch(console.error);
         }
-
-        // Fallback: delete locally
-        const localUsers = getFromLocalStorage<AppUser[]>('lmp_users') || [];
-        const updatedUsers = localUsers.filter((u) => u.id !== userId);
-        saveToLocalStorage('lmp_users', updatedUsers);
-        set({ allUsers: updatedUsers });
       },
 
-      // Sync Actions
+      deleteUser: async (userId) => {
+        if (!isFirebaseConfigured()) return;
+        try {
+          const fbService = await import('./firebase-service');
+          await fbService.deleteUser(userId);
+          await get().loadAdminData();
+        } catch (e) {
+          console.warn('[Store] Delete user error:', e);
+        }
+      },
+
+      // ----- Sync -----
       syncToFirebase: async () => {
-        if (!isFirebaseConfigured() || !get().user) return;
+        if (!isFirebaseConfigured() || !get().user || get().isAdmin) return;
 
         try {
           const fbService = await import('./firebase-service');
           const { user, shoppingLists, budget, favorites } = get();
           if (!user) return;
 
-          // Sync lists
           for (const list of shoppingLists) {
             await fbService.saveShoppingList(user.id, list as ShoppingListData);
           }
-
-          // Sync budget
           await fbService.saveBudget(user.id, budget as BudgetData);
-
-          // Sync favorites
           await fbService.saveFavorites(user.id, favorites as ShoppingItemData[]);
         } catch (e) {
           console.warn('[Store] Firebase sync error:', e);
@@ -608,7 +446,7 @@ export const useStore = create<AppState & AppActions>()(
       },
 
       syncFromFirebase: async () => {
-        if (!isFirebaseConfigured() || !get().user) return;
+        if (!isFirebaseConfigured() || !get().user || get().isAdmin) return;
 
         try {
           const fbService = await import('./firebase-service');
@@ -624,9 +462,7 @@ export const useStore = create<AppState & AppActions>()(
           if (fbLists.length > 0) {
             set({ shoppingLists: fbLists as AppShoppingList[] });
           }
-          if (fbBudget) {
-            set({ budget: fbBudget as AppBudget });
-          }
+          if (fbBudget) set({ budget: fbBudget as AppBudget });
           if (fbFavorites.length > 0) {
             set({ favorites: fbFavorites as AppShoppingItem[] });
           }
@@ -635,10 +471,67 @@ export const useStore = create<AppState & AppActions>()(
         }
       },
 
-      // Tutorial
-      dismissTutorial: () => {
-        set({ showTutorial: false });
+      // ----- Purchase history -----
+      archiveList: async (listId, store) => {
+        const list = get().shoppingLists.find((l) => l.id === listId);
+        const user = get().user;
+        if (!list || !user) return false;
+        if (!isFirebaseConfigured()) return false;
+
+        try {
+          const fbService = await import('./firebase-service');
+          const entry = await fbService.archiveListToHistory(
+            user.id,
+            list as ShoppingListData,
+            store
+          );
+          if (!entry) return false;
+
+          // Remove the archived list locally and on Firebase
+          set((state) => ({
+            shoppingLists: state.shoppingLists.filter((l) => l.id !== listId),
+            purchaseHistory: [entry, ...state.purchaseHistory],
+          }));
+          await fbService.deleteShoppingList(user.id, listId);
+          return true;
+        } catch (e) {
+          console.warn('[Store] archiveList error:', e);
+          return false;
+        }
       },
+
+      loadPurchaseHistory: async () => {
+        if (!isFirebaseConfigured()) return;
+        const user = get().user;
+        if (!user || get().isAdmin) return;
+
+        try {
+          const fbService = await import('./firebase-service');
+          const history = await fbService.getPurchaseHistory(user.id);
+          set({ purchaseHistory: history });
+        } catch (e) {
+          console.warn('[Store] loadPurchaseHistory error:', e);
+        }
+      },
+
+      deleteHistoryEntry: async (historyId) => {
+        const user = get().user;
+        if (!user) return;
+        set((state) => ({
+          purchaseHistory: state.purchaseHistory.filter((h) => h.id !== historyId),
+        }));
+        if (isFirebaseConfigured()) {
+          try {
+            const fbService = await import('./firebase-service');
+            await fbService.deleteHistoryEntry(user.id, historyId);
+          } catch (e) {
+            console.warn('[Store] deleteHistoryEntry error:', e);
+          }
+        }
+      },
+
+      // ----- Tutorial -----
+      dismissTutorial: () => set({ showTutorial: false }),
     }),
     {
       name: 'le-meilleur-panier-storage',
@@ -652,27 +545,8 @@ export const useStore = create<AppState & AppActions>()(
         theme: state.theme,
         accessKeys: state.accessKeys,
         showTutorial: state.showTutorial,
+        // purchaseHistory deliberately NOT persisted — reloaded from Firebase
       }),
     }
   )
 );
-
-// Helpers for localStorage
-function getFromLocalStorage<T>(key: string): T | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    const item = localStorage.getItem(key);
-    return item ? JSON.parse(item) : null;
-  } catch {
-    return null;
-  }
-}
-
-function saveToLocalStorage<T>(key: string, value: T): void {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch (e) {
-    console.error('Error saving to localStorage:', e);
-  }
-}
