@@ -29,10 +29,11 @@ import {
 } from '@/components/ui/alert-dialog';
 import { isFirebaseConfigured } from '@/lib/firebase';
 import { Users, Key, BarChart3, Plus, Trash2, AlertTriangle, Wifi, WifiOff, RefreshCw, Shield, Activity } from 'lucide-react';
+import AdminProductsTable from './AdminProductsTable';
 
 export default function AdminPanel() {
   const { allUsers, accessKeys, loadAdminData, createAccessKey, deleteUser, language, shoppingLists } = useStore();
-  const [activeTab, setActiveTab] = useState<'users' | 'keys'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'keys' | 'products'>('users');
   const [newKey, setNewKey] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -180,6 +181,17 @@ export default function AdminPanel() {
         >
           <Key className="w-4 h-4" />
           {t('adminKeys', language)} ({accessKeys.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('products')}
+          className={`flex items-center gap-2 flex-1 py-2.5 px-4 rounded-lg text-sm font-semibold transition-all duration-300 ${
+            activeTab === 'products'
+              ? 'bg-white dark:bg-gray-800 shadow-md shadow-emerald-500/10 text-emerald-700 dark:text-emerald-400'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <span className="text-base">🏷️</span>
+          {t('manageProducts', language)}
         </button>
       </div>
 
@@ -344,6 +356,17 @@ export default function AdminPanel() {
               </div>
             </CardContent>
           </Card>
+        </motion.div>
+      )}
+
+      {/* Products Tab */}
+      {activeTab === 'products' && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+        >
+          <AdminProductsTable />
         </motion.div>
       )}
     </div>

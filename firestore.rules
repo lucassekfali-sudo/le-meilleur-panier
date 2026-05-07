@@ -7,6 +7,9 @@ rules_version = '2';
 //     SDK from a trusted environment.
 //   - Allow the client to read/write its own data subcollections:
 //     lists, budget, favorites, history.
+//   - Allow ANY authenticated client to read products (so the comparison
+//     page can build its data) and any client to write them (admin panel
+//     gates this in the UI).
 //
 // Note: this matches the previous app behaviour where lists/budget are
 // stored under users/{userId}/* and the user is identified via the
@@ -32,6 +35,14 @@ service cloud.firestore {
     match /accessKeys/{keyId} {
       allow read:  if false;
       allow write: if false;
+    }
+
+    // === Product catalog ===
+    // Read: anyone (so price comparison works for all users)
+    // Write: anyone (admin UI is gated client-side; for true security
+    //               migrate to Firebase Auth + custom claims later)
+    match /products/{productId} {
+      allow read, write: if true;
     }
 
     // Default deny everything else

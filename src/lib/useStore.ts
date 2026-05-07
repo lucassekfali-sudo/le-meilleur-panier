@@ -10,6 +10,7 @@ import type {
   BudgetData,
   AccessKeyData,
   PurchaseHistoryEntry,
+  ProductData,
 } from './firebase-service';
 
 // NOTE: ADMIN_EMAIL, ADMIN_KEY and DEFAULT_ACCESS_KEYS used to be hardcoded
@@ -75,6 +76,9 @@ interface AppState {
   /** Not persisted in localStorage — always reloaded from Firebase on login. */
   purchaseHistory: PurchaseHistoryEntry[];
 
+  /** Catalog of all products (admin-managed). */
+  products: ProductData[];
+
   showTutorial: boolean;
 
   /** Last error message returned by /api/auth (for UI display). */
@@ -132,6 +136,12 @@ interface AppActions {
   loadPurchaseHistory: () => Promise<void>;
   deleteHistoryEntry: (historyId: string) => Promise<void>;
 
+  // Product catalog
+  loadProducts: () => Promise<void>;
+  addProduct: (data: Omit<ProductData, 'id' | 'updatedAt'>) => Promise<boolean>;
+  updateProductEntry: (id: string, updates: Partial<ProductData>) => Promise<void>;
+  removeProduct: (id: string) => Promise<void>;
+
   // Tutorial
   dismissTutorial: () => void;
 }
@@ -180,6 +190,7 @@ export const useStore = create<AppState & AppActions>()(
       allUsers: [],
       accessKeys: [],
       purchaseHistory: [],
+      products: [],
       showTutorial: false,
       authError: null,
       firebaseAvailable: isFirebaseConfigured(),
@@ -530,7 +541,59 @@ export const useStore = create<AppState & AppActions>()(
         }
       },
 
-      // ----- Tutorial -----
+      // ----- Product catalog -----
+      loadProducts: async () => {
+        if (!isFirebaseConfigured()) return;
+        try {
+          const fbService = await import('./firebase-service');
+          const products = await fbService.getProducts();
+          set({ products });
+        } catch (e) {
+          console.warn('[Store] loadProducts error:', e);
+        }
+      },
+
+      addProduct: async (data) => {
+        if (!isFirebaseConfigured()) return false;
+        try {
+          const fbService = await import('./firebase-service');
+          const created = await fbService.createProduct(data);
+          if (!created) return false;
+          set((state) => ({ products: [...state.products, created] }));
+          return true;
+        } catch (e) {
+          console.warn('[Store] addProduct error:', e);
+          return false;
+        }
+      },
+
+      updateProductEntry: async (id, updates) => {
+        if (!isFirebaseConfigured()) return;
+        try {
+          const fbService = await import('./firebase-service');
+          await fbService.updateProduct(id, updates);
+          set((state) => ({
+            products: state.products.map((p) =>
+              p.id === id ? { ...p, ...updates, updatedAt: new Date().toISOString() } : p
+            ),
+          }));
+        } catch (e) {
+          console.warn('[Store] updateProductEntry error:', e);
+        }
+      },
+
+      removeProduct: async (id) => {
+        if (!isFirebaseConfigured()) return;
+        set((state) => ({ products: state.products.filter((p) => p.id !== id) }));
+        try {
+          const fbService = await import('./firebase-service');
+          await fbService.deleteProduct(id);
+        } catch (e) {
+          console.warn('[Store] removeProduct error:', e);
+        }
+      },
+
+            // ----- Tutorial -----
       dismissTutorial: () => set({ showTutorial: false }),
     }),
     {

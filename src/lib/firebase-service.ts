@@ -89,6 +89,21 @@ export interface PurchaseHistoryEntry {
   archivedAt: string;
 }
 
+/** A single product entry — one row per (product, store) pair. */
+export interface ProductData {
+  id: string;
+  name: string;            // "Coca-Cola 1.5L"
+  brand?: string;          // "Coca-Cola"
+  category?: string;       // "beverages"
+  store: string;           // "Carrefour"
+  regularPrice: number;
+  promoPrice?: number;
+  promoEndDate?: string;   // ISO date string
+  imageUrl?: string;
+  notes?: string;
+  updatedAt: string;
+}
+
 // Default access keys to seed
 const DEFAULT_ACCESS_KEYS = [
   'RI8ZJB6BXB',
@@ -577,6 +592,83 @@ export async function deleteHistoryEntry(
   } catch (error) {
     console.error('[Firebase] Error deleting history entry:', error);
   }
+}
+
+// ========== Product Catalog Operations ==========
+
+/** Get every product in the catalog. */
+export async function getProducts(): Promise<ProductData[]> {
+  const firestore = getDb();
+  if (!firestore) return [];
+  try {
+    const snapshot = await getDocs(collection(firestore, 'products'));
+    return snapshot.docs.map((d) => d.data() as ProductData);
+  } catch (error) {
+    console.error('[Firebase] Error getting products:', error);
+    return [];
+  }
+}
+
+/** Add a new product entry (one row per product+store combo). */
+export async function createProduct(
+  data: Omit<ProductData, 'id' | 'updatedAt'>
+): Promise<ProductData | null> {
+  const firestore = getDb();
+  if (!firestore) return null;
+  try {
+    const id = 'prod_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
+    const product: ProductData = {
+      ...data,
+      id,
+      updatedAt: new Date().toISOString(),
+    };
+    await setDoc(doc(firestore, 'products', id), product);
+    return product;
+  } catch (error) {
+    console.error('[Firebase] Error creating product:', error);
+    return null;
+  }
+}
+
+/** Update an existing product. */
+export async function updateProduct(
+  id: string,
+  updates: Partial<Omit<ProductData, 'id'>>
+): Promise<void> {
+  const firestore = getDb();
+  if (!firestore) return;
+  try {
+    await updateDoc(doc(firestore, 'products', id), {
+      ...updates,
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error('[Firebase] Error updating product:', error);
+  }
+}
+
+/** Delete a product entry. */
+export async function deleteProduct(id: string): Promise<void> {
+  const firestore = getDb();
+  if (!firestore) return;
+  try {
+    await deleteDoc(doc(firestore, 'products', id));
+  } catch (error) {
+    console.error('[Firebase] Error deleting product:', error);
+  }
+}
+
+/**
+ * Helper: returns the effective price for a product right now.
+ * Uses promoPrice if it exists and the promo hasn't expired, else regularPrice.
+ */
+export function effectivePrice(p: ProductData): number {
+  if (p.promoPrice == null) return p.regularPrice;
+  if (!p.promoEndDate) return p.promoPrice;
+  if (new Date(p.promoEndDate).getTime() >= Date.now()) {
+    return p.promoPrice;
+  }
+  return p.regularPrice;
 }
 
 // ========== Helper ==========
