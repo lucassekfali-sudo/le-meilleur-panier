@@ -410,7 +410,7 @@ export async function validateAccessKey(key: string): Promise<boolean> {
 export async function markAccessKeyAsUsed(
   key: string,
   userId: string,
-  email: string
+  email?: string
 ): Promise<void> {
   const firestore = getDb();
   if (!firestore) return;
@@ -418,7 +418,7 @@ export async function markAccessKeyAsUsed(
   try {
     await setDoc(doc(firestore, 'accessKeys', key), {
       key,
-      usedBy: email,
+      usedBy: email ?? userId,
       usedAt: new Date().toISOString(),
       active: false,
     });
@@ -582,5 +582,4 @@ export async function deleteHistoryEntry(
 // ========== Helper ==========
 export function timestampToDate(ts: Timestamp | string): string {
   if (typeof ts === 'string') return ts;
-  return ts.toDate().toISOString();
-}
+  return ts.toDate().toISOS
