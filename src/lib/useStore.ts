@@ -231,7 +231,7 @@ export const useStore = create<AppState & AppActions>()(
         });
 
         // Background data load (non-fatal if it fails)
-        if (!data.isAdmin && isFirebaseConfigured()) {
+        if (isFirebaseConfigured()) {
           try {
             await get().syncFromFirebase();
             await get().loadPurchaseHistory();
@@ -439,7 +439,7 @@ export const useStore = create<AppState & AppActions>()(
 
       // ----- Sync -----
       syncToFirebase: async () => {
-        if (!isFirebaseConfigured() || !get().user || get().isAdmin) return;
+        if (!isFirebaseConfigured() || !get().user) return;
 
         try {
           const fbService = await import('./firebase-service');
@@ -457,7 +457,7 @@ export const useStore = create<AppState & AppActions>()(
       },
 
       syncFromFirebase: async () => {
-        if (!isFirebaseConfigured() || !get().user || get().isAdmin) return;
+        if (!isFirebaseConfigured() || !get().user) return;
 
         try {
           const fbService = await import('./firebase-service');
@@ -514,7 +514,7 @@ export const useStore = create<AppState & AppActions>()(
       loadPurchaseHistory: async () => {
         if (!isFirebaseConfigured()) return;
         const user = get().user;
-        if (!user || get().isAdmin) return;
+        if (!user) return;
 
         try {
           const fbService = await import('./firebase-service');
