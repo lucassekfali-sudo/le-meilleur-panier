@@ -803,31 +803,3 @@ export default function ShoppingListPage() {
     </div>
   );
 }
-
-
-============================================
-
-)}
-                placeholder={t('listName', language)}
-                className="mt-1.5 border-emerald-200/60 dark:border-emerald-800/40 focus-visible:ring-emerald-500/50 rounded-xl h-11"
-                onKeyDown={(e) => e.key === 'Enter' && handleCreateList()}
-                autoFocus
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowNewListDialog(false)} className="rounded-xl">
-              {t('cancel', language)}
-            </Button>
-            <Button
-              onClick={handleCreateList}
-              className="gradient-emerald hover:opacity-90 text-white rounded-xl"
-            >
-              {t('createList', language)}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-}
