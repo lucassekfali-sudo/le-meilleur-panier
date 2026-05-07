@@ -582,4 +582,5 @@ export async function deleteHistoryEntry(
 // ========== Helper ==========
 export function timestampToDate(ts: Timestamp | string): string {
   if (typeof ts === 'string') return ts;
-  return ts.toDate().toISOS
+  return ts.toDate().toISOString();
+}
