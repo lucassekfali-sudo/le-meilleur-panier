@@ -19,7 +19,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { Plus, Trash2, Pencil, Save, X, Image as ImageIcon, Search } from 'lucide-react';
+import { Plus, Trash2, Pencil, Save, X, Image as ImageIcon, Search, Sparkles } from 'lucide-react';
 
 type Draft = Omit<ProductData, 'id' | 'updatedAt'>;
 
@@ -43,6 +43,25 @@ export default function AdminProductsTable() {
   const [newDraft, setNewDraft] = useState<Draft>(emptyDraft);
   const [search, setSearch] = useState('');
   const [filterStore, setFilterStore] = useState<string>('');
+  const [seeding, setSeeding] = useState(false);
+  const [seedMessage, setSeedMessage] = useState<string | null>(null);
+
+  const handleSeed = async () => {
+    setSeeding(true);
+    setSeedMessage(null);
+    try {
+      const fbService = await import('@/lib/firebase-service');
+      const count = await fbService.seedSampleProducts();
+      setSeedMessage(t('seedSuccess', language).replace('{count}', String(count)));
+      await loadProducts();
+    } catch (e) {
+      console.error('[AdminProducts] seed error:', e);
+      setSeedMessage('Error');
+    } finally {
+      setSeeding(false);
+      setTimeout(() => setSeedMessage(null), 4000);
+    }
+  };
 
   useEffect(() => {
     loadProducts();
@@ -150,6 +169,16 @@ export default function AdminProductsTable() {
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">{products.length} {t('products', language)}</span>
           <Button
+            onClick={handleSeed}
+            disabled={seeding}
+            variant="outline"
+            className="rounded-xl"
+            title={t('seedTooltip', language)}
+          >
+            <Sparkles className="w-4 h-4 mr-1" />
+            {seeding ? '...' : t('seedSampleProducts', language)}
+          </Button>
+          <Button
             onClick={() => { setShowNewRow(true); setNewDraft(emptyDraft); }}
             className="gradient-emerald text-white rounded-xl"
           >
@@ -158,6 +187,12 @@ export default function AdminProductsTable() {
           </Button>
         </div>
       </div>
+
+      {seedMessage && (
+        <div className="text-sm text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl px-3 py-2">
+          {seedMessage}
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex items-center gap-2 flex-wrap">

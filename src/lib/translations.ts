@@ -87,6 +87,18 @@ export const translations: Record<Language, Record<string, string>> = {
     notFoundInStore: 'non trouvé dans ce magasin',
     cheapest: 'Le moins cher',
     sortedByPrice: 'classés par prix',
+    searchProductTitle: 'Chercher un produit',
+    searchProductPlaceholder: 'Tape le nom du produit (ex : lait, pain...)',
+    searchProductHint: 'Tape le nom d\'un produit pour comparer les prix entre magasins.',
+    addToList: 'Ajouter à une liste',
+    chooseList: 'Choisis une liste',
+    orCreateNewList: 'ou créer une nouvelle liste',
+    orPickExistingList: 'ou choisir une liste existante',
+    newListName: 'Nom de la nouvelle liste',
+    emptyListNoCompare: 'Cette liste est vide — ajoute des articles pour comparer les prix.',
+    seedSampleProducts: 'Importer des exemples',
+    seedTooltip: 'Ajoute 30 produits courants en 3 magasins pour tester',
+    seedSuccess: '✨ {count} produits ajoutés au catalogue',
 
     // Shopping List
     myLists: 'Mes Listes',
@@ -162,7 +174,6 @@ export const translations: Record<Language, Record<string, string>> = {
     removeFavorite: 'Retirer des favoris',
     noFavorites: 'Aucun favori pour le moment',
     noFavoritesDesc: 'Ajoutez des articles fréquents à vos favoris !',
-    addToList: 'Ajouter à une liste',
 
     // Settings
     settings: 'Paramètres',
@@ -328,6 +339,18 @@ export const translations: Record<Language, Record<string, string>> = {
     notFoundInStore: 'not found in this store',
     cheapest: 'Cheapest',
     sortedByPrice: 'sorted by price',
+    searchProductTitle: 'Search a product',
+    searchProductPlaceholder: 'Type a product name (e.g. milk, bread...)',
+    searchProductHint: 'Type a product name to compare prices across stores.',
+    addToList: 'Add to a list',
+    chooseList: 'Choose a list',
+    orCreateNewList: 'or create a new list',
+    orPickExistingList: 'or pick an existing list',
+    newListName: 'New list name',
+    emptyListNoCompare: 'This list is empty — add items to compare prices.',
+    seedSampleProducts: 'Import samples',
+    seedTooltip: 'Add 30 common products across 3 stores to test the comparison',
+    seedSuccess: '✨ {count} products added to catalog',
 
     // Shopping List
     myLists: 'My Lists',
@@ -403,7 +426,6 @@ export const translations: Record<Language, Record<string, string>> = {
     removeFavorite: 'Remove from favorites',
     noFavorites: 'No favorites yet',
     noFavoritesDesc: 'Add frequent items to your favorites!',
-    addToList: 'Add to list',
 
     // Settings
     settings: 'Settings',
@@ -569,6 +591,18 @@ export const translations: Record<Language, Record<string, string>> = {
     notFoundInStore: 'no encontrado en esta tienda',
     cheapest: 'Más barato',
     sortedByPrice: 'ordenados por precio',
+    searchProductTitle: 'Buscar un producto',
+    searchProductPlaceholder: 'Escribe el nombre (ej: leche, pan...)',
+    searchProductHint: 'Escribe un nombre de producto para comparar precios entre tiendas.',
+    addToList: 'Agregar a una lista',
+    chooseList: 'Elige una lista',
+    orCreateNewList: 'o crear una nueva lista',
+    orPickExistingList: 'o elegir una lista existente',
+    newListName: 'Nombre de la nueva lista',
+    emptyListNoCompare: 'Esta lista está vacía — agrega productos para comparar precios.',
+    seedSampleProducts: 'Importar ejemplos',
+    seedTooltip: 'Añade 30 productos comunes en 3 tiendas para probar',
+    seedSuccess: '✨ {count} productos agregados al catálogo',
 
     // Shopping List
     myLists: 'Mis Listas',
@@ -644,7 +678,6 @@ export const translations: Record<Language, Record<string, string>> = {
     removeFavorite: 'Quitar de favoritos',
     noFavorites: 'No hay favoritos todavía',
     noFavoritesDesc: '¡Añade artículos frecuentes a tus favoritos!',
-    addToList: 'Añadir a una lista',
 
     // Settings
     settings: 'Configuración',

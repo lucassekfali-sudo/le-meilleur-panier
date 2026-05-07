@@ -10,6 +10,7 @@ import PriceComparison from './PriceComparison';
 import SettingsPage from './SettingsPage';
 import AdminPanel from './AdminPanel';
 import PurchaseHistory from './PurchaseHistory';
+import ListPriceCompare from './ListPriceCompare';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -92,6 +93,7 @@ export default function ShoppingListPage() {
   const [openListId, setOpenListId] = useState<string | null>(null);
   const [newListName, setNewListName] = useState('');
   const [showNewListDialog, setShowNewListDialog] = useState(false);
+  const [compareListId, setCompareListId] = useState<string | null>(null);
   const [newItemName, setNewItemName] = useState('');
   const [newItemPrice, setNewItemPrice] = useState('');
   const [newItemQuantity, setNewItemQuantity] = useState('1');
@@ -372,6 +374,15 @@ export default function ShoppingListPage() {
               <span className="text-emerald-600 dark:text-emerald-500">{checked} {t('checkedItems', language)}</span>
             </div>
           </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setCompareListId(openList.id)}
+            className="text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 rounded-xl transition-all"
+            title={t('comparePrices', language)}
+          >
+            <span className="text-lg">💰</span>
+          </Button>
           <Button
             variant="ghost"
             size="icon"
@@ -798,6 +809,22 @@ export default function ShoppingListPage() {
               {t('createList', language)}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Compare prices dialog */}
+      <Dialog open={!!compareListId} onOpenChange={(open) => !open && setCompareListId(null)}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <span className="text-2xl">💰</span>
+              {t('comparePrices', language)}
+            </DialogTitle>
+          </DialogHeader>
+          {compareListId && (() => {
+            const list = shoppingLists.find((l) => l.id === compareListId);
+            return list ? <ListPriceCompare list={list} /> : null;
+          })()}
         </DialogContent>
       </Dialog>
     </div>

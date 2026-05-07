@@ -671,6 +671,60 @@ export function effectivePrice(p: ProductData): number {
   return p.regularPrice;
 }
 
+/**
+ * Seed the catalog with a starter set of common products across 3 stores.
+ * Returns the number of products added.
+ */
+export async function seedSampleProducts(): Promise<number> {
+  const firestore = getDb();
+  if (!firestore) return 0;
+
+  const samples: Array<Omit<ProductData, 'id' | 'updatedAt'>> = [
+    // === Carrefour ===
+    { name: 'Lait demi-écrémé Lactel 1L', brand: 'Lactel', category: 'dairy', store: 'Carrefour', regularPrice: 1.20 },
+    { name: 'Coca-Cola 1.5L', brand: 'Coca-Cola', category: 'beverages', store: 'Carrefour', regularPrice: 1.95, promoPrice: 1.49 },
+    { name: 'Pain de mie Harrys 500g', brand: 'Harrys', category: 'bakery', store: 'Carrefour', regularPrice: 2.10 },
+    { name: 'Yaourt nature Danone 4x125g', brand: 'Danone', category: 'dairy', store: 'Carrefour', regularPrice: 2.05 },
+    { name: 'Pommes Golden 1kg', brand: '', category: 'fruits', store: 'Carrefour', regularPrice: 2.49 },
+    { name: 'Bananes 1kg', brand: '', category: 'fruits', store: 'Carrefour', regularPrice: 1.79 },
+    { name: 'Poulet entier 1kg', brand: '', category: 'meat', store: 'Carrefour', regularPrice: 6.99 },
+    { name: 'Pâtes Panzani Penne 500g', brand: 'Panzani', category: 'other', store: 'Carrefour', regularPrice: 1.45 },
+    { name: 'Riz Uncle Ben\'s 1kg', brand: 'Uncle Ben\'s', category: 'other', store: 'Carrefour', regularPrice: 4.20 },
+    { name: 'Beurre President doux 250g', brand: 'President', category: 'dairy', store: 'Carrefour', regularPrice: 2.85 },
+
+    // === Lidl ===
+    { name: 'Lait demi-écrémé Lactel 1L', brand: 'Lactel', category: 'dairy', store: 'Lidl', regularPrice: 0.95 },
+    { name: 'Coca-Cola 1.5L', brand: 'Coca-Cola', category: 'beverages', store: 'Lidl', regularPrice: 1.65 },
+    { name: 'Pain de mie 500g', brand: '', category: 'bakery', store: 'Lidl', regularPrice: 1.49 },
+    { name: 'Yaourt nature 4x125g', brand: '', category: 'dairy', store: 'Lidl', regularPrice: 1.40 },
+    { name: 'Pommes Golden 1kg', brand: '', category: 'fruits', store: 'Lidl', regularPrice: 1.99 },
+    { name: 'Bananes 1kg', brand: '', category: 'fruits', store: 'Lidl', regularPrice: 1.39 },
+    { name: 'Poulet entier 1kg', brand: '', category: 'meat', store: 'Lidl', regularPrice: 5.49 },
+    { name: 'Pâtes Penne 500g', brand: '', category: 'other', store: 'Lidl', regularPrice: 0.79 },
+    { name: 'Riz long grain 1kg', brand: '', category: 'other', store: 'Lidl', regularPrice: 1.95 },
+    { name: 'Beurre doux 250g', brand: '', category: 'dairy', store: 'Lidl', regularPrice: 2.25 },
+
+    // === Auchan ===
+    { name: 'Lait demi-écrémé Lactel 1L', brand: 'Lactel', category: 'dairy', store: 'Auchan', regularPrice: 1.10, promoPrice: 0.85 },
+    { name: 'Coca-Cola 1.5L', brand: 'Coca-Cola', category: 'beverages', store: 'Auchan', regularPrice: 1.85 },
+    { name: 'Pain de mie Harrys 500g', brand: 'Harrys', category: 'bakery', store: 'Auchan', regularPrice: 1.95 },
+    { name: 'Yaourt nature Danone 4x125g', brand: 'Danone', category: 'dairy', store: 'Auchan', regularPrice: 1.95 },
+    { name: 'Pommes Golden 1kg', brand: '', category: 'fruits', store: 'Auchan', regularPrice: 2.29 },
+    { name: 'Bananes 1kg', brand: '', category: 'fruits', store: 'Auchan', regularPrice: 1.59 },
+    { name: 'Poulet entier 1kg', brand: '', category: 'meat', store: 'Auchan', regularPrice: 6.49, promoPrice: 4.99 },
+    { name: 'Pâtes Panzani Penne 500g', brand: 'Panzani', category: 'other', store: 'Auchan', regularPrice: 1.35 },
+    { name: 'Riz Uncle Ben\'s 1kg', brand: 'Uncle Ben\'s', category: 'other', store: 'Auchan', regularPrice: 3.89 },
+    { name: 'Beurre President doux 250g', brand: 'President', category: 'dairy', store: 'Auchan', regularPrice: 2.65 },
+  ];
+
+  let count = 0;
+  for (const sample of samples) {
+    const created = await createProduct(sample);
+    if (created) count++;
+  }
+  return count;
+}
+
 // ========== Helper ==========
 export function timestampToDate(ts: Timestamp | string): string {
   if (typeof ts === 'string') return ts;
