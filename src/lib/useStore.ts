@@ -669,8 +669,15 @@ export const useStore = create<AppState & AppActions>()(
           unit,
           createdAt: new Date().toISOString(),
         };
+        console.log('[Store] addGoal called:', newGoal.title, newGoal.id);
         set((state) => ({ goals: [...state.goals, newGoal] }));
-        get().syncToFirebase();
+        // Save directly to Firebase instead of full sync
+        if (isFirebaseConfigured() && get().user) {
+          import('./firebase-service')
+            .then((fb) => fb.saveGoal(get().user!.id, newGoal))
+            .then(() => console.log('[Store] Goal saved to Firebase'))
+            .catch((e) => console.error('[Store] Goal Firebase save error:', e));
+        }
       },
 
       removeGoal: (goalId) => {
@@ -715,7 +722,7 @@ export const useStore = create<AppState & AppActions>()(
 
         try {
           const fbService = await import('./firebase-service');
-          const goals = await fbService.getGoals(user.id);
+          const fbGoals = await fbService.getGoals(user.id);
 
           // Load last 30 days of logs
           const today = new Date();
@@ -724,8 +731,16 @@ export const useStore = create<AppState & AppActions>()(
           const startDate = thirtyDaysAgo.toISOString().split('T')[0];
           const endDate = today.toISOString().split('T')[0];
 
-          const goalLogs = await fbService.getGoalLogs(user.id, startDate, endDate);
-          set({ goals, goalLogs });
+          const fbGoalLogs = await fbService.getGoalLogs(user.id, startDate, endDate);
+          
+          // Only overwrite if Firebase has data, otherwise keep local
+          if (fbGoals.length > 0) {
+            set({ goals: fbGoals });
+          }
+          if (fbGoalLogs.length > 0) {
+            set({ goalLogs: fbGoalLogs });
+          }
+          console.log('[Store] loadGoals: Firebase has', fbGoals.length, 'goals,', fbGoalLogs.length, 'logs');
         } catch (e) {
           console.warn('[Store] loadGoals error:', e);
         }

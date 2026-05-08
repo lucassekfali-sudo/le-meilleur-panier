@@ -177,8 +177,17 @@ export default function GoalsPage() {
   };
 
   const handleAddGoal = () => {
-    if (!newTitle.trim() || !newTarget) return;
-    addGoal(newTitle.trim(), newFrequency, parseInt(newTarget) || 1, newUnit.trim());
+    if (!newTitle.trim()) {
+      console.log('[GoalsPage] handleAddGoal: title is empty, aborting');
+      return;
+    }
+    const target = parseInt(newTarget);
+    if (!target || target < 1) {
+      console.log('[GoalsPage] handleAddGoal: invalid target:', newTarget, 'parsed:', target);
+      return;
+    }
+    console.log('[GoalsPage] handleAddGoal: creating goal:', newTitle.trim(), newFrequency, target, newUnit.trim());
+    addGoal(newTitle.trim(), newFrequency, target, newUnit.trim());
     setNewTitle('');
     setNewFrequency('daily');
     setNewTarget('');
