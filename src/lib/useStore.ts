@@ -11,6 +11,8 @@ import type {
   AccessKeyData,
   PurchaseHistoryEntry,
   ProductData,
+  GoalData,
+  GoalLogData,
 } from './firebase-service';
 
 // NOTE: ADMIN_EMAIL, ADMIN_KEY and DEFAULT_ACCESS_KEYS used to be hardcoded
@@ -79,6 +81,9 @@ interface AppState {
   /** Catalog of all products (admin-managed). */
   products: ProductData[];
 
+  goals: GoalData[];
+  goalLogs: GoalLogData[];
+
   showTutorial: boolean;
 
   /** Last error message returned by /api/auth (for UI display). */
@@ -142,6 +147,12 @@ interface AppActions {
   updateProductEntry: (id: string, updates: Partial<ProductData>) => Promise<void>;
   removeProduct: (id: string) => Promise<void>;
 
+  // Goals
+  addGoal: (title: string, frequency: 'daily' | 'weekly', targetValue: number, unit: string) => void;
+  removeGoal: (goalId: string) => void;
+  updateGoalLog: (date: string, goalId: string, value: number) => void;
+  loadGoals: () => Promise<void>;
+
   // Tutorial
   dismissTutorial: () => void;
 }
@@ -191,6 +202,8 @@ export const useStore = create<AppState & AppActions>()(
       accessKeys: [],
       purchaseHistory: [],
       products: [],
+      goals: [],
+      goalLogs: [],
       showTutorial: false,
       authError: null,
       firebaseAvailable: isFirebaseConfigured(),
@@ -451,6 +464,12 @@ export const useStore = create<AppState & AppActions>()(
           }
           await fbService.saveBudget(user.id, budget as BudgetData);
           await fbService.saveFavorites(user.id, favorites as ShoppingItemData[]);
+
+          // Sync goals
+          const { goals } = get();
+          for (const goal of goals) {
+            await fbService.saveGoal(user.id, goal as GoalData);
+          }
         } catch (e) {
           console.warn('[Store] Firebase sync error:', e);
         }
@@ -464,10 +483,11 @@ export const useStore = create<AppState & AppActions>()(
           const { user } = get();
           if (!user) return;
 
-          const [fbLists, fbBudget, fbFavorites] = await Promise.all([
+          const [fbLists, fbBudget, fbFavorites, fbGoals] = await Promise.all([
             fbService.getShoppingLists(user.id),
             fbService.getBudget(user.id),
             fbService.getFavorites(user.id),
+            fbService.getGoals(user.id),
           ]);
 
           if (fbLists.length > 0) {
@@ -476,6 +496,20 @@ export const useStore = create<AppState & AppActions>()(
           if (fbBudget) set({ budget: fbBudget as AppBudget });
           if (fbFavorites.length > 0) {
             set({ favorites: fbFavorites as AppShoppingItem[] });
+          }
+          if (fbGoals.length > 0) {
+            set({ goals: fbGoals });
+          }
+
+          // Load goal logs
+          const today = new Date();
+          const thirtyDaysAgo = new Date(today);
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+          const startDate = thirtyDaysAgo.toISOString().split('T')[0];
+          const endDate = today.toISOString().split('T')[0];
+          const goalLogs = await fbService.getGoalLogs(user.id, startDate, endDate);
+          if (goalLogs.length > 0) {
+            set({ goalLogs });
           }
         } catch (e) {
           console.warn('[Store] Firebase sync from error:', e);
@@ -593,7 +627,79 @@ export const useStore = create<AppState & AppActions>()(
         }
       },
 
-            // ----- Tutorial -----
+      // ----- Goals -----
+      addGoal: (title, frequency, targetValue, unit) => {
+        const newGoal: GoalData = {
+          id: 'goal_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9),
+          title,
+          frequency,
+          targetValue,
+          unit,
+          createdAt: new Date().toISOString(),
+        };
+        set((state) => ({ goals: [...state.goals, newGoal] }));
+        get().syncToFirebase();
+      },
+
+      removeGoal: (goalId) => {
+        set((state) => ({ goals: state.goals.filter((g) => g.id !== goalId) }));
+        if (isFirebaseConfigured() && get().user) {
+          import('./firebase-service')
+            .then((fb) => fb.deleteGoal(get().user!.id, goalId))
+            .catch(console.error);
+        }
+      },
+
+      updateGoalLog: (date, goalId, value) => {
+        set((state) => {
+          const existing = state.goalLogs.find((l) => l.date === date);
+          let newLogs: GoalLogData[];
+          if (existing) {
+            newLogs = state.goalLogs.map((l) =>
+              l.date === date
+                ? { ...l, logs: { ...l.logs, [goalId]: value } }
+                : l
+            );
+          } else {
+            newLogs = [...state.goalLogs, { date, logs: { [goalId]: value } }];
+          }
+          return { goalLogs: newLogs };
+        });
+        // Save to firebase
+        if (isFirebaseConfigured() && get().user) {
+          const logEntry = get().goalLogs.find((l) => l.date === date);
+          if (logEntry) {
+            import('./firebase-service')
+              .then((fb) => fb.saveGoalLog(get().user!.id, date, logEntry.logs))
+              .catch(console.error);
+          }
+        }
+      },
+
+      loadGoals: async () => {
+        if (!isFirebaseConfigured()) return;
+        const user = get().user;
+        if (!user) return;
+
+        try {
+          const fbService = await import('./firebase-service');
+          const goals = await fbService.getGoals(user.id);
+
+          // Load last 30 days of logs
+          const today = new Date();
+          const thirtyDaysAgo = new Date(today);
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+          const startDate = thirtyDaysAgo.toISOString().split('T')[0];
+          const endDate = today.toISOString().split('T')[0];
+
+          const goalLogs = await fbService.getGoalLogs(user.id, startDate, endDate);
+          set({ goals, goalLogs });
+        } catch (e) {
+          console.warn('[Store] loadGoals error:', e);
+        }
+      },
+
+      // ----- Tutorial -----
       dismissTutorial: () => set({ showTutorial: false }),
     }),
     {
@@ -607,6 +713,8 @@ export const useStore = create<AppState & AppActions>()(
         language: state.language,
         theme: state.theme,
         accessKeys: state.accessKeys,
+        goals: state.goals,
+        goalLogs: state.goalLogs,
         showTutorial: state.showTutorial,
         // purchaseHistory deliberately NOT persisted — reloaded from Firebase
       }),

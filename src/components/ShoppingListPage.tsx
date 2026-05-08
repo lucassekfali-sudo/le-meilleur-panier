@@ -11,6 +11,7 @@ import SettingsPage from './SettingsPage';
 import AdminPanel from './AdminPanel';
 import PurchaseHistory from './PurchaseHistory';
 import ListPriceCompare from './ListPriceCompare';
+import GoalsPage from './GoalsPage';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -57,7 +58,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 
-type NavPage = 'lists' | 'budget' | 'favorites' | 'compare' | 'history' | 'settings' | 'admin';
+type NavPage = 'lists' | 'budget' | 'favorites' | 'compare' | 'history' | 'goals' | 'settings' | 'admin';
 
 const categories = [
   { key: 'catFruits', value: 'fruits' },
@@ -178,6 +179,7 @@ export default function ShoppingListPage() {
     { key: 'favorites', icon: <span className="text-lg">⭐</span>, label: t('navFavorites', language) },
     { key: 'compare', icon: <span className="text-lg">🔍</span>, label: t('navCompare', language) },
     { key: 'history', icon: <span className="text-lg">🕐</span>, label: t('navHistory', language) },
+    { key: 'goals', icon: <span className="text-lg">🎯</span>, label: t('navGoals', language) },
     { key: 'settings', icon: <span className="text-lg">⚙️</span>, label: t('navSettings', language) },
   ];
 
@@ -196,6 +198,8 @@ export default function ShoppingListPage() {
         return <PriceComparison />;
       case 'history':
         return <PurchaseHistory />;
+      case 'goals':
+        return <GoalsPage />;
       case 'settings':
         return <SettingsPage />;
       case 'admin':

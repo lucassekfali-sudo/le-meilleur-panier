@@ -725,6 +725,99 @@ export async function seedSampleProducts(): Promise<number> {
   return count;
 }
 
+// ========== Goals Operations ==========
+
+export interface GoalData {
+  id: string;
+  title: string;
+  frequency: 'daily' | 'weekly';
+  targetValue: number;
+  unit: string;
+  createdAt: string;
+}
+
+export interface GoalLogData {
+  date: string; // YYYY-MM-DD
+  logs: Record<string, number>; // goalId -> value achieved
+}
+
+export async function saveGoal(userId: string, goal: GoalData): Promise<void> {
+  const firestore = getDb();
+  if (!firestore) return;
+
+  try {
+    await setDoc(doc(firestore, 'users', userId, 'goals', goal.id), goal);
+  } catch (error) {
+    console.error('[Firebase] Error saving goal:', error);
+  }
+}
+
+export async function getGoals(userId: string): Promise<GoalData[]> {
+  const firestore = getDb();
+  if (!firestore) return [];
+
+  try {
+    const snapshot = await getDocs(
+      collection(firestore, 'users', userId, 'goals')
+    );
+    return snapshot.docs.map((d) => d.data() as GoalData);
+  } catch (error) {
+    console.error('[Firebase] Error getting goals:', error);
+    return [];
+  }
+}
+
+export async function deleteGoal(userId: string, goalId: string): Promise<void> {
+  const firestore = getDb();
+  if (!firestore) return;
+
+  try {
+    await deleteDoc(doc(firestore, 'users', userId, 'goals', goalId));
+  } catch (error) {
+    console.error('[Firebase] Error deleting goal:', error);
+  }
+}
+
+export async function saveGoalLog(userId: string, date: string, logs: Record<string, number>): Promise<void> {
+  const firestore = getDb();
+  if (!firestore) return;
+
+  try {
+    await setDoc(doc(firestore, 'users', userId, 'goalLogs', date), { date, logs });
+  } catch (error) {
+    console.error('[Firebase] Error saving goal log:', error);
+  }
+}
+
+export async function getGoalLogs(userId: string, startDate: string, endDate: string): Promise<GoalLogData[]> {
+  const firestore = getDb();
+  if (!firestore) return [];
+
+  try {
+    const q = query(
+      collection(firestore, 'users', userId, 'goalLogs'),
+      where('date', '>=', startDate),
+      where('date', '<=', endDate),
+      orderBy('date', 'asc')
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((d) => d.data() as GoalLogData);
+  } catch (error) {
+    // Fallback without ordering
+    try {
+      const snapshot = await getDocs(collection(firestore, 'users', userId, 'goalLogs'));
+      const all = snapshot.docs
+        .map((d) => d.data() as GoalLogData)
+        .filter((log) => log.date >= startDate && log.date <= endDate);
+      all.sort((a, b) => (a.date < b.date ? -1 : 1));
+      return all;
+    } catch (fallbackError) {
+      console.error('[Firebase] Error getting goal logs:', error, fallbackError);
+      return [];
+    }
+  }
+}
+
 // ========== Helper ==========
 export function timestampToDate(ts: Timestamp | string): string {
   if (typeof ts === 'string') return ts;
