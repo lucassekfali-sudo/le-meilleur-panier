@@ -13,6 +13,7 @@ import PurchaseHistory from './PurchaseHistory';
 import ListPriceCompare from './ListPriceCompare';
 import GoalsPage from './GoalsPage';
 import SharedExpensesPage from './SharedExpensesPage';
+import ReceiptScanner from './ReceiptScanner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -107,6 +108,7 @@ export default function ShoppingListPage() {
   const [editCategory, setEditCategory] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
 
   const openList = shoppingLists.find((l) => l.id === openListId);
 
@@ -398,6 +400,15 @@ export default function ShoppingListPage() {
             className="text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 rounded-xl transition-all"
           >
             <Share2 className="w-5 h-5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setShowScanner(true)}
+            className="text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 rounded-xl transition-all"
+            title={t('scanReceipt', language)}
+          >
+            <span className="text-lg">📸</span>
           </Button>
         </div>
 
@@ -835,6 +846,15 @@ export default function ShoppingListPage() {
           })()}
         </DialogContent>
       </Dialog>
+
+      {/* Receipt Scanner */}
+      {showScanner && openListId && (
+        <ReceiptScanner
+          open={showScanner}
+          onClose={() => setShowScanner(false)}
+          listId={openListId}
+        />
+      )}
     </div>
   );
 }
