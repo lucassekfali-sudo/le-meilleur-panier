@@ -31,6 +31,10 @@ service cloud.firestore {
       match /history/{historyId} { allow read, write: if true; }
       match /goals/{goalId}      { allow read, write: if true; }
       match /goalLogs/{date}     { allow read, write: if true; }
+      match /groups/{groupId}    {
+        allow read, write: if true;
+        match /expenses/{expenseId} { allow read, write: if true; }
+      }
     }
 
     // === Access keys (server-only) ===

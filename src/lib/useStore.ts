@@ -13,6 +13,8 @@ import type {
   ProductData,
   GoalData,
   GoalLogData,
+  GroupData,
+  ExpenseData,
 } from './firebase-service';
 
 // NOTE: ADMIN_EMAIL, ADMIN_KEY and DEFAULT_ACCESS_KEYS used to be hardcoded
@@ -84,6 +86,8 @@ interface AppState {
   goals: GoalData[];
   goalLogs: GoalLogData[];
 
+  groups: (GroupData & { expenses?: ExpenseData[] })[];
+
   showTutorial: boolean;
 
   /** Last error message returned by /api/auth (for UI display). */
@@ -153,6 +157,15 @@ interface AppActions {
   updateGoalLog: (date: string, goalId: string, value: number) => void;
   loadGoals: () => Promise<void>;
 
+  // Tricount / Shared Expenses
+  addGroup: (name: string) => void;
+  removeGroup: (groupId: string) => void;
+  addParticipant: (groupId: string, name: string) => void;
+  removeParticipant: (groupId: string, name: string) => void;
+  addExpense: (groupId: string, expense: Omit<ExpenseData, 'id' | 'createdAt'>) => void;
+  removeExpense: (groupId: string, expenseId: string) => void;
+  loadGroups: () => Promise<void>;
+
   // Tutorial
   dismissTutorial: () => void;
 }
@@ -204,6 +217,7 @@ export const useStore = create<AppState & AppActions>()(
       products: [],
       goals: [],
       goalLogs: [],
+      groups: [],
       showTutorial: false,
       authError: null,
       firebaseAvailable: isFirebaseConfigured(),
@@ -292,6 +306,7 @@ export const useStore = create<AppState & AppActions>()(
             foodBudget: 0,
           },
           purchaseHistory: [],
+          groups: [],
           showTutorial: false,
         });
       },
@@ -466,9 +481,14 @@ export const useStore = create<AppState & AppActions>()(
           await fbService.saveFavorites(user.id, favorites as ShoppingItemData[]);
 
           // Sync goals
-          const { goals } = get();
+          const { goals, groups } = get();
           for (const goal of goals) {
             await fbService.saveGoal(user.id, goal as GoalData);
+          }
+
+          // Sync groups
+          for (const group of groups) {
+            await fbService.saveGroup(user.id, group as GroupData);
           }
         } catch (e) {
           console.warn('[Store] Firebase sync error:', e);
@@ -499,6 +519,18 @@ export const useStore = create<AppState & AppActions>()(
           }
           if (fbGoals.length > 0) {
             set({ goals: fbGoals });
+          }
+
+          // Load groups with expenses
+          const fbGroups = await fbService.getGroups(user.id);
+          if (fbGroups.length > 0) {
+            const groupsWithExpenses = await Promise.all(
+              fbGroups.map(async (g) => {
+                const expenses = await fbService.getExpenses(user.id, g.id);
+                return { ...g, expenses };
+              })
+            );
+            set({ groups: groupsWithExpenses });
           }
 
           // Load goal logs
@@ -699,6 +731,105 @@ export const useStore = create<AppState & AppActions>()(
         }
       },
 
+      // ----- Tricount / Shared Expenses -----
+      addGroup: (name) => {
+        const newGroup: GroupData = {
+          id: 'grp_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9),
+          name,
+          participants: [],
+          createdAt: new Date().toISOString(),
+        };
+        set((state) => ({ groups: [...state.groups, newGroup] }));
+        get().syncToFirebase();
+      },
+
+      removeGroup: (groupId) => {
+        set((state) => ({ groups: state.groups.filter((g) => g.id !== groupId) }));
+        if (isFirebaseConfigured() && get().user) {
+          import('./firebase-service')
+            .then((fb) => fb.deleteGroup(get().user!.id, groupId))
+            .catch(console.error);
+        }
+      },
+
+      addParticipant: (groupId, name) => {
+        set((state) => ({
+          groups: state.groups.map((g) =>
+            g.id === groupId
+              ? { ...g, participants: [...g.participants, name] }
+              : g
+          ),
+        }));
+        get().syncToFirebase();
+      },
+
+      removeParticipant: (groupId, name) => {
+        set((state) => ({
+          groups: state.groups.map((g) =>
+            g.id === groupId
+              ? { ...g, participants: g.participants.filter((p) => p !== name) }
+              : g
+          ),
+        }));
+        get().syncToFirebase();
+      },
+
+      addExpense: (groupId, expenseData) => {
+        const expense: ExpenseData = {
+          ...expenseData,
+          id: 'exp_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9),
+          createdAt: new Date().toISOString(),
+        };
+        set((state) => ({
+          groups: state.groups.map((g) =>
+            g.id === groupId
+              ? { ...g, expenses: [...(g.expenses || []), expense] }
+              : g
+          ),
+        }));
+        if (isFirebaseConfigured() && get().user) {
+          import('./firebase-service')
+            .then((fb) => fb.saveExpense(get().user!.id, groupId, expense))
+            .catch(console.error);
+        }
+      },
+
+      removeExpense: (groupId, expenseId) => {
+        set((state) => ({
+          groups: state.groups.map((g) =>
+            g.id === groupId
+              ? { ...g, expenses: (g.expenses || []).filter((e) => e.id !== expenseId) }
+              : g
+          ),
+        }));
+        if (isFirebaseConfigured() && get().user) {
+          import('./firebase-service')
+            .then((fb) => fb.deleteExpense(get().user!.id, groupId, expenseId))
+            .catch(console.error);
+        }
+      },
+
+      loadGroups: async () => {
+        if (!isFirebaseConfigured()) return;
+        const user = get().user;
+        if (!user) return;
+
+        try {
+          const fbService = await import('./firebase-service');
+          const groups = await fbService.getGroups(user.id);
+          // Load expenses for each group
+          const groupsWithExpenses = await Promise.all(
+            groups.map(async (g) => {
+              const expenses = await fbService.getExpenses(user.id, g.id);
+              return { ...g, expenses };
+            })
+          );
+          set({ groups: groupsWithExpenses });
+        } catch (e) {
+          console.warn('[Store] loadGroups error:', e);
+        }
+      },
+
       // ----- Tutorial -----
       dismissTutorial: () => set({ showTutorial: false }),
     }),
@@ -715,6 +846,7 @@ export const useStore = create<AppState & AppActions>()(
         accessKeys: state.accessKeys,
         goals: state.goals,
         goalLogs: state.goalLogs,
+        groups: state.groups,
         showTutorial: state.showTutorial,
         // purchaseHistory deliberately NOT persisted — reloaded from Firebase
       }),
