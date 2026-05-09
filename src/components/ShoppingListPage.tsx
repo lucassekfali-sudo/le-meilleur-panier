@@ -13,6 +13,9 @@ import PurchaseHistory from './PurchaseHistory';
 import ListPriceCompare from './ListPriceCompare';
 import Celebration from './Celebration';
 import StatsHeader from './StatsHeader';
+import GoalsPage from './GoalsPage';
+import SharedExpensesPage from './SharedExpensesPage';
+import ReceiptScanner from './ReceiptScanner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -59,7 +62,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 
-type NavPage = 'lists' | 'budget' | 'favorites' | 'compare' | 'history' | 'settings' | 'admin';
+type NavPage = 'lists' | 'budget' | 'favorites' | 'compare' | 'history' | 'goals' | 'tricount' | 'settings' | 'admin';
 
 const categories = [
   { key: 'catFruits', value: 'fruits' },
@@ -108,6 +111,7 @@ export default function ShoppingListPage() {
   const [editCategory, setEditCategory] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
 
   const openList = shoppingLists.find((l) => l.id === openListId);
 
@@ -181,6 +185,8 @@ export default function ShoppingListPage() {
     { key: 'favorites', icon: <span className="text-lg">⭐</span>, label: t('navFavorites', language) },
     { key: 'compare', icon: <span className="text-lg">🔍</span>, label: t('navCompare', language) },
     { key: 'history', icon: <span className="text-lg">🕐</span>, label: t('navHistory', language) },
+    { key: 'goals', icon: <span className="text-lg">🎯</span>, label: t('navGoals', language) },
+    { key: 'tricount', icon: <span className="text-lg">👥</span>, label: t('navTricount', language) },
     { key: 'settings', icon: <span className="text-lg">⚙️</span>, label: t('navSettings', language) },
   ];
 
@@ -199,6 +205,10 @@ export default function ShoppingListPage() {
         return <PriceComparison />;
       case 'history':
         return <PurchaseHistory />;
+      case 'goals':
+        return <GoalsPage />;
+      case 'tricount':
+        return <SharedExpensesPage />;
       case 'settings':
         return <SettingsPage />;
       case 'admin':
@@ -396,6 +406,15 @@ export default function ShoppingListPage() {
             className="text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 rounded-xl transition-all"
           >
             <Share2 className="w-5 h-5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setShowScanner(true)}
+            className="text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 rounded-xl transition-all"
+            title={t('scanReceipt', language)}
+          >
+            <span className="text-lg">📸</span>
           </Button>
         </div>
 
@@ -847,6 +866,15 @@ export default function ShoppingListPage() {
         message={celebrate.message}
         onDone={() => setCelebrate({ show: false })}
       />
+
+      {/* Receipt Scanner */}
+      {showScanner && openListId && (
+        <ReceiptScanner
+          open={showScanner}
+          onClose={() => setShowScanner(false)}
+          listId={openListId}
+        />
+      )}
     </div>
   );
 }

@@ -725,6 +725,200 @@ export async function seedSampleProducts(): Promise<number> {
   return count;
 }
 
+// ========== Goals Operations ==========
+
+export interface GoalData {
+  id: string;
+  title: string;
+  frequency: 'daily' | 'weekly';
+  targetValue: number;
+  unit: string;
+  createdAt: string;
+}
+
+export interface GoalLogData {
+  date: string; // YYYY-MM-DD
+  logs: Record<string, number>; // goalId -> value achieved
+}
+
+export async function saveGoal(userId: string, goal: GoalData): Promise<void> {
+  const firestore = getDb();
+  if (!firestore) return;
+
+  try {
+    await setDoc(doc(firestore, 'users', userId, 'goals', goal.id), goal);
+  } catch (error) {
+    console.error('[Firebase] Error saving goal:', error);
+  }
+}
+
+export async function getGoals(userId: string): Promise<GoalData[]> {
+  const firestore = getDb();
+  if (!firestore) return [];
+
+  try {
+    const snapshot = await getDocs(
+      collection(firestore, 'users', userId, 'goals')
+    );
+    return snapshot.docs.map((d) => d.data() as GoalData);
+  } catch (error) {
+    console.error('[Firebase] Error getting goals:', error);
+    return [];
+  }
+}
+
+export async function deleteGoal(userId: string, goalId: string): Promise<void> {
+  const firestore = getDb();
+  if (!firestore) return;
+
+  try {
+    await deleteDoc(doc(firestore, 'users', userId, 'goals', goalId));
+  } catch (error) {
+    console.error('[Firebase] Error deleting goal:', error);
+  }
+}
+
+export async function saveGoalLog(userId: string, date: string, logs: Record<string, number>): Promise<void> {
+  const firestore = getDb();
+  if (!firestore) return;
+
+  try {
+    await setDoc(doc(firestore, 'users', userId, 'goalLogs', date), { date, logs });
+  } catch (error) {
+    console.error('[Firebase] Error saving goal log:', error);
+  }
+}
+
+export async function getGoalLogs(userId: string, startDate: string, endDate: string): Promise<GoalLogData[]> {
+  const firestore = getDb();
+  if (!firestore) return [];
+
+  try {
+    const q = query(
+      collection(firestore, 'users', userId, 'goalLogs'),
+      where('date', '>=', startDate),
+      where('date', '<=', endDate),
+      orderBy('date', 'asc')
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((d) => d.data() as GoalLogData);
+  } catch (error) {
+    // Fallback without ordering
+    try {
+      const snapshot = await getDocs(collection(firestore, 'users', userId, 'goalLogs'));
+      const all = snapshot.docs
+        .map((d) => d.data() as GoalLogData)
+        .filter((log) => log.date >= startDate && log.date <= endDate);
+      all.sort((a, b) => (a.date < b.date ? -1 : 1));
+      return all;
+    } catch (fallbackError) {
+      console.error('[Firebase] Error getting goal logs:', error, fallbackError);
+      return [];
+    }
+  }
+}
+
+// ========== Tricount / Shared Expenses Operations ==========
+
+export interface GroupData {
+  id: string;
+  name: string;
+  participants: string[];
+  createdAt: string;
+}
+
+export interface ExpenseData {
+  id: string;
+  groupId: string;
+  description: string;
+  amount: number;
+  paidBy: string;        // participant name
+  splitAmong: string[];  // participant names
+  createdAt: string;
+}
+
+export async function saveGroup(userId: string, group: GroupData): Promise<void> {
+  const firestore = getDb();
+  if (!firestore) return;
+
+  try {
+    await setDoc(doc(firestore, 'users', userId, 'groups', group.id), group);
+  } catch (error) {
+    console.error('[Firebase] Error saving group:', error);
+  }
+}
+
+export async function getGroups(userId: string): Promise<GroupData[]> {
+  const firestore = getDb();
+  if (!firestore) return [];
+
+  try {
+    const snapshot = await getDocs(
+      collection(firestore, 'users', userId, 'groups')
+    );
+    return snapshot.docs.map((d) => d.data() as GroupData);
+  } catch (error) {
+    console.error('[Firebase] Error getting groups:', error);
+    return [];
+  }
+}
+
+export async function deleteGroup(userId: string, groupId: string): Promise<void> {
+  const firestore = getDb();
+  if (!firestore) return;
+
+  try {
+    // Delete all expenses in the group first
+    const expensesSnapshot = await getDocs(
+      collection(firestore, 'users', userId, 'groups', groupId, 'expenses')
+    );
+    for (const expDoc of expensesSnapshot.docs) {
+      await deleteDoc(expDoc.ref);
+    }
+    // Delete the group itself
+    await deleteDoc(doc(firestore, 'users', userId, 'groups', groupId));
+  } catch (error) {
+    console.error('[Firebase] Error deleting group:', error);
+  }
+}
+
+export async function saveExpense(userId: string, groupId: string, expense: ExpenseData): Promise<void> {
+  const firestore = getDb();
+  if (!firestore) return;
+
+  try {
+    await setDoc(doc(firestore, 'users', userId, 'groups', groupId, 'expenses', expense.id), expense);
+  } catch (error) {
+    console.error('[Firebase] Error saving expense:', error);
+  }
+}
+
+export async function getExpenses(userId: string, groupId: string): Promise<ExpenseData[]> {
+  const firestore = getDb();
+  if (!firestore) return [];
+
+  try {
+    const snapshot = await getDocs(
+      collection(firestore, 'users', userId, 'groups', groupId, 'expenses')
+    );
+    return snapshot.docs.map((d) => d.data() as ExpenseData);
+  } catch (error) {
+    console.error('[Firebase] Error getting expenses:', error);
+    return [];
+  }
+}
+
+export async function deleteExpense(userId: string, groupId: string, expenseId: string): Promise<void> {
+  const firestore = getDb();
+  if (!firestore) return;
+
+  try {
+    await deleteDoc(doc(firestore, 'users', userId, 'groups', groupId, 'expenses', expenseId));
+  } catch (error) {
+    console.error('[Firebase] Error deleting expense:', error);
+  }
+}
+
 // ========== Helper ==========
 export function timestampToDate(ts: Timestamp | string): string {
   if (typeof ts === 'string') return ts;
