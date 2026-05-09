@@ -53,8 +53,9 @@
 
 :root {
   --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+  /* Warm cream background — pairs with the Terracotta & Sage palette */
+  --background: oklch(0.985 0.01 80);
+  --foreground: oklch(0.20 0.02 60);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
@@ -210,35 +211,62 @@
     background: linear-gradient(
       90deg,
       transparent 0%,
-      rgba(16, 185, 129, 0.08) 50%,
+      rgba(201, 124, 93, 0.08) 50%,
       transparent 100%
     );
     background-size: 200% 100%;
     animation: shimmer 2.5s ease-in-out infinite;
   }
 
+  /* === Le Meilleur Panier — palette Terracotta & Sage ===
+     `gradient-emerald` is kept as the class name (used everywhere) but
+     now renders as a warm terracotta gradient — the primary CTA accent.
+     All `bg-emerald-XXX` / `text-emerald-XXX` Tailwind classes are
+     remapped to a sage scale via tailwind.config.ts. */
+
   .gradient-emerald {
-    background: linear-gradient(135deg, #10b981 0%, #059669 50%, #047857 100%);
+    background: linear-gradient(135deg, #df8a5a 0%, #c97c5d 50%, #b06343 100%);
   }
 
   .gradient-emerald-light {
-    background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 50%, #a7f3d0 100%);
+    background: linear-gradient(135deg, #fdf5ef 0%, #fae8db 50%, #f4cfb6 100%);
+  }
+
+  .gradient-sage {
+    background: linear-gradient(135deg, #90a583 0%, #728866 50%, #5b6f51 100%);
+  }
+
+  .gradient-honey {
+    background: linear-gradient(135deg, #ecc35c 0%, #d4a04c 50%, #b6831e 100%);
   }
 
   .shadow-emerald {
-    box-shadow: 
-      0 4px 14px rgba(16, 185, 129, 0.15),
-      0 2px 6px rgba(16, 185, 129, 0.1);
+    box-shadow:
+      0 4px 14px rgba(201, 124, 93, 0.18),
+      0 2px 6px rgba(201, 124, 93, 0.10);
   }
 
   .shadow-emerald-lg {
-    box-shadow: 
-      0 10px 30px rgba(16, 185, 129, 0.2),
-      0 4px 10px rgba(16, 185, 129, 0.12);
+    box-shadow:
+      0 10px 30px rgba(201, 124, 93, 0.22),
+      0 4px 10px rgba(201, 124, 93, 0.12);
+  }
+
+  .shadow-honey {
+    box-shadow:
+      0 4px 14px rgba(212, 160, 76, 0.25),
+      0 2px 6px rgba(212, 160, 76, 0.15);
   }
 
   .text-gradient-emerald {
-    background: linear-gradient(135deg, #059669, #10b981, #34d399);
+    background: linear-gradient(135deg, #b06343, #c97c5d, #df8a5a);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .text-gradient-honey {
+    background: linear-gradient(135deg, #b6831e, #d4a04c, #ecc35c);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -256,20 +284,20 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(16, 185, 129, 0.2);
+  background: rgba(201, 124, 93, 0.25);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(16, 185, 129, 0.4);
+  background: rgba(201, 124, 93, 0.45);
 }
 
 .dark ::-webkit-scrollbar-thumb {
-  background: rgba(16, 185, 129, 0.15);
+  background: rgba(201, 124, 93, 0.2);
 }
 
 .dark ::-webkit-scrollbar-thumb:hover {
-  background: rgba(16, 185, 129, 0.3);
+  background: rgba(201, 124, 93, 0.35);
 }
 
 /* Smooth transitions globally */

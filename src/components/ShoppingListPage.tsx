@@ -11,6 +11,8 @@ import SettingsPage from './SettingsPage';
 import AdminPanel from './AdminPanel';
 import PurchaseHistory from './PurchaseHistory';
 import ListPriceCompare from './ListPriceCompare';
+import Celebration from './Celebration';
+import StatsHeader from './StatsHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -94,6 +96,7 @@ export default function ShoppingListPage() {
   const [newListName, setNewListName] = useState('');
   const [showNewListDialog, setShowNewListDialog] = useState(false);
   const [compareListId, setCompareListId] = useState<string | null>(null);
+  const [celebrate, setCelebrate] = useState<{ show: boolean; message?: string }>({ show: false });
   const [newItemName, setNewItemName] = useState('');
   const [newItemPrice, setNewItemPrice] = useState('');
   const [newItemQuantity, setNewItemQuantity] = useState('1');
@@ -216,6 +219,9 @@ export default function ShoppingListPage() {
 
     return (
       <div className="space-y-4">
+        {/* Stats header */}
+        <StatsHeader />
+
         {/* Search */}
         <div className="relative">
           <Input
@@ -407,9 +413,10 @@ export default function ShoppingListPage() {
             onClick={async () => {
               const ok = await archiveList(openList.id);
               if (ok) {
+                setCelebrate({ show: true, message: t('listCompleted', language) });
                 setOpenListId(null);
                 setSearchQuery('');
-                setActivePage('history');
+                setTimeout(() => setActivePage('history'), 1500);
               }
             }}
             className="gradient-emerald hover:opacity-90 text-white rounded-xl w-full shadow-emerald transition-all duration-300"
@@ -537,11 +544,18 @@ export default function ShoppingListPage() {
                       ) : (
                         /* Display mode */
                         <div className="flex items-center gap-3">
-                          <Checkbox
-                            checked={item.checked}
-                            onCheckedChange={() => toggleItem(openList.id, item.id)}
-                            className="data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500 transition-all"
-                          />
+                          <motion.div
+                            key={item.checked ? 'checked' : 'unchecked'}
+                            initial={item.checked ? { scale: 0.6 } : false}
+                            animate={item.checked ? { scale: [0.6, 1.25, 1] } : { scale: 1 }}
+                            transition={{ duration: 0.35, ease: 'easeOut' }}
+                          >
+                            <Checkbox
+                              checked={item.checked}
+                              onCheckedChange={() => toggleItem(openList.id, item.id)}
+                              className="data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500 transition-all"
+                            />
+                          </motion.div>
                           <div className="flex-1 min-w-0">
                             <div className={`font-medium text-sm transition-all duration-300 ${item.checked ? 'line-through text-muted-foreground' : ''}`}>
                               {item.name}
@@ -827,6 +841,12 @@ export default function ShoppingListPage() {
           })()}
         </DialogContent>
       </Dialog>
+
+      <Celebration
+        show={celebrate.show}
+        message={celebrate.message}
+        onDone={() => setCelebrate({ show: false })}
+      />
     </div>
   );
 }

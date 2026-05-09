@@ -100,6 +100,13 @@ export const translations: Record<Language, Record<string, string>> = {
     seedTooltip: 'Ajoute 30 produits courants en 3 magasins pour tester',
     seedSuccess: '✨ {count} produits ajoutés au catalogue',
 
+    // Stats / Celebration
+    statsLists: 'Listes',
+    statsCompletion: 'Complétion',
+    statsThisMonth: 'Ce mois',
+    statsArchived: 'Archivées',
+    listCompleted: 'Bien joué !',
+
     // Shopping List
     myLists: 'Mes Listes',
     newList: 'Nouvelle liste',
@@ -352,6 +359,13 @@ export const translations: Record<Language, Record<string, string>> = {
     seedTooltip: 'Add 30 common products across 3 stores to test the comparison',
     seedSuccess: '✨ {count} products added to catalog',
 
+    // Stats / Celebration
+    statsLists: 'Lists',
+    statsCompletion: 'Completion',
+    statsThisMonth: 'This month',
+    statsArchived: 'Archived',
+    listCompleted: 'Nice job!',
+
     // Shopping List
     myLists: 'My Lists',
     newList: 'New List',
@@ -603,6 +617,13 @@ export const translations: Record<Language, Record<string, string>> = {
     seedSampleProducts: 'Importar ejemplos',
     seedTooltip: 'Añade 30 productos comunes en 3 tiendas para probar',
     seedSuccess: '✨ {count} productos agregados al catálogo',
+
+    // Stats / Celebration
+    statsLists: 'Listas',
+    statsCompletion: 'Completado',
+    statsThisMonth: 'Este mes',
+    statsArchived: 'Archivadas',
+    listCompleted: '¡Bien hecho!',
 
     // Shopping List
     myLists: 'Mis Listas',
