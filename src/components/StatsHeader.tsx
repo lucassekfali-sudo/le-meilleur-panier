@@ -4,11 +4,12 @@ import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { useStore } from '@/lib/useStore';
 import { t } from '@/lib/translations';
+import NumberTicker from '@/components/ui/number-ticker';
 import { ShoppingCart, CheckCircle2, TrendingUp, Calendar } from 'lucide-react';
 
 /**
  * A compact dashboard shown at the top of the lists page.
- * Surfaces user activity (lists, items checked, this-month spend, savings) at a glance.
+ * Surfaces user activity at a glance with animated number tickers.
  */
 export default function StatsHeader() {
   const { language, shoppingLists, purchaseHistory } = useStore();
@@ -37,49 +38,58 @@ export default function StatsHeader() {
     return { totalLists, totalItems, checkedItems, completionRate, thisMonthSpend };
   }, [shoppingLists, purchaseHistory]);
 
-  const fmt = (n: number) =>
-    n.toLocaleString(language === 'en' ? 'en-US' : language === 'es' ? 'es-ES' : 'fr-FR', {
-      style: 'currency',
-      currency: 'EUR',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    });
+  const fmtLocale =
+    language === 'en' ? 'en-US' : language === 'es' ? 'es-ES' : 'fr-FR';
 
   return (
     <motion.div
       initial={{ opacity: 0, y: -10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="grid grid-cols-2 sm:grid-cols-4 gap-2"
+      className="grid grid-cols-2 sm:grid-cols-4 gap-2.5"
     >
       <StatCard
         icon={<ShoppingCart className="w-4 h-4" />}
         label={t('statsLists', language)}
-        value={String(stats.totalLists)}
-        accent="emerald"
+        accent="terracotta"
         delay={0}
-      />
+      >
+        <NumberTicker value={stats.totalLists} delay={100} />
+      </StatCard>
+
       <StatCard
         icon={<CheckCircle2 className="w-4 h-4" />}
         label={t('statsCompletion', language)}
-        value={`${stats.completionRate}%`}
         sub={`${stats.checkedItems}/${stats.totalItems}`}
-        accent="emerald"
+        accent="sage"
         delay={0.05}
-      />
+      >
+        <NumberTicker value={stats.completionRate} delay={200} />
+        <span className="ml-0.5">%</span>
+      </StatCard>
+
       <StatCard
         icon={<Calendar className="w-4 h-4" />}
         label={t('statsThisMonth', language)}
-        value={fmt(stats.thisMonthSpend)}
-        accent="blue"
+        accent="honey"
         delay={0.1}
-      />
+      >
+        <NumberTicker
+          value={stats.thisMonthSpend}
+          decimals={0}
+          locale={fmtLocale}
+          currency="EUR"
+          delay={300}
+        />
+      </StatCard>
+
       <StatCard
         icon={<TrendingUp className="w-4 h-4" />}
         label={t('statsArchived', language)}
-        value={String(purchaseHistory.length)}
-        accent="purple"
+        accent="rose"
         delay={0.15}
-      />
+      >
+        <NumberTicker value={purchaseHistory.length} delay={400} />
+      </StatCard>
     </motion.div>
   );
 }
@@ -87,33 +97,58 @@ export default function StatsHeader() {
 interface StatCardProps {
   icon: React.ReactNode;
   label: string;
-  value: string;
   sub?: string;
-  accent: 'emerald' | 'blue' | 'purple';
+  accent: 'terracotta' | 'sage' | 'honey' | 'rose';
   delay: number;
+  children: React.ReactNode;
 }
 
-function StatCard({ icon, label, value, sub, accent, delay }: StatCardProps) {
-  const accentColors = {
-    emerald: 'text-emerald-600 dark:text-emerald-400',
-    blue: 'text-blue-600 dark:text-blue-400',
-    purple: 'text-purple-600 dark:text-purple-400',
-  }[accent];
+function StatCard({ icon, label, sub, accent, delay, children }: StatCardProps) {
+  const palettes: Record<StatCardProps['accent'], { text: string; bg: string; border: string }> = {
+    terracotta: {
+      text: 'text-terracotta-700 dark:text-terracotta-300',
+      bg: 'bg-gradient-to-br from-terracotta-50 to-white dark:from-terracotta-950/30 dark:to-gray-900/40',
+      border: 'border-terracotta-200/50 dark:border-terracotta-800/30',
+    },
+    sage: {
+      text: 'text-emerald-700 dark:text-emerald-300',
+      bg: 'bg-gradient-to-br from-emerald-50 to-white dark:from-emerald-950/30 dark:to-gray-900/40',
+      border: 'border-emerald-200/50 dark:border-emerald-800/30',
+    },
+    honey: {
+      text: 'text-honey-700 dark:text-honey-300',
+      bg: 'bg-gradient-to-br from-honey-50 to-white dark:from-honey-950/30 dark:to-gray-900/40',
+      border: 'border-honey-200/60 dark:border-honey-800/30',
+    },
+    rose: {
+      text: 'text-rose-700 dark:text-rose-300',
+      bg: 'bg-gradient-to-br from-rose-50 to-white dark:from-rose-950/30 dark:to-gray-900/40',
+      border: 'border-rose-200/50 dark:border-rose-800/30',
+    },
+  };
+  const p = palettes[accent];
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ delay, type: 'spring', stiffness: 200, damping: 20 }}
-      className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-emerald-200/40 dark:border-emerald-800/30 rounded-xl p-3 hover:shadow-md hover:shadow-emerald-500/5 transition-shadow"
+      initial={{ opacity: 0, scale: 0.95, y: 8 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      transition={{ delay, type: 'spring', stiffness: 220, damping: 22 }}
+      whileHover={{ y: -2, transition: { duration: 0.15 } }}
+      className={`group relative ${p.bg} backdrop-blur-sm border ${p.border} rounded-2xl p-3.5 transition-all hover:shadow-lg hover:shadow-black/5 cursor-default overflow-hidden`}
     >
-      <div className={`flex items-center gap-1.5 text-xs ${accentColors}`}>
+      {/* subtle decorative ring */}
+      <div className={`absolute -top-6 -right-6 w-16 h-16 rounded-full ${p.text} opacity-[0.06] group-hover:opacity-[0.12] transition-opacity`}
+           style={{ background: 'currentColor' }} />
+
+      <div className={`relative flex items-center gap-1.5 text-[11px] uppercase tracking-wide font-medium ${p.text}`}>
         {icon}
-        <span className="font-medium truncate">{label}</span>
+        <span className="truncate">{label}</span>
       </div>
-      <div className="mt-1 flex items-baseline gap-1">
-        <span className="text-xl font-bold tabular-nums">{value}</span>
-        {sub && <span className="text-xs text-muted-foreground">· {sub}</span>}
+      <div className="relative mt-1.5 flex items-baseline gap-1">
+        <span className={`text-2xl font-bold tabular-nums leading-none ${p.text}`}>
+          {children}
+        </span>
+        {sub && <span className="text-[11px] text-muted-foreground font-medium">· {sub}</span>}
       </div>
     </motion.div>
   );
