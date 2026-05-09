@@ -56,10 +56,10 @@ const AVATAR_COLORS = [
   'bg-sky-500',
   'bg-violet-500',
   'bg-orange-500',
-  'bg-teal-500',
+  'bg-honey-500',
   'bg-pink-500',
   'bg-indigo-500',
-  'bg-lime-500',
+  'bg-terracotta-400',
 ];
 
 function getInitials(name: string): string {

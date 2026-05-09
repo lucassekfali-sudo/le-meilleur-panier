@@ -57,7 +57,7 @@ function CelebrationParticles() {
     id: i,
     angle: (i / 12) * 360,
     delay: i * 0.05,
-    color: ['#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4'][i % 5],
+    color: ['#c97c5d', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4'][i % 5],
   }));
 
   return (

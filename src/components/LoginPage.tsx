@@ -85,17 +85,17 @@ export default function LoginPage() {
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {/* Primary floating blobs */}
         <div className="absolute -top-40 -right-40 w-[500px] h-[500px] rounded-full bg-gradient-to-br from-emerald-200/40 to-emerald-300/20 dark:from-emerald-900/25 dark:to-emerald-800/10 blur-3xl animate-float" />
-        <div className="absolute -bottom-40 -left-40 w-[450px] h-[450px] rounded-full bg-gradient-to-tr from-emerald-300/30 to-teal-200/20 dark:from-emerald-800/15 dark:to-teal-900/10 blur-3xl animate-float-slow" />
-        <div className="absolute top-1/3 left-1/4 w-[300px] h-[300px] rounded-full bg-gradient-to-br from-teal-200/20 to-emerald-100/15 dark:from-teal-900/10 dark:to-emerald-900/5 blur-3xl animate-float-delayed" />
+        <div className="absolute -bottom-40 -left-40 w-[450px] h-[450px] rounded-full bg-gradient-to-tr from-terracotta-300/30 to-terracotta-200/20 dark:from-emerald-800/15 dark:to-teal-900/10 blur-3xl animate-float-slow" />
+        <div className="absolute top-1/3 left-1/4 w-[300px] h-[300px] rounded-full bg-gradient-to-br from-terracotta-200/20 to-terracotta-100/15 dark:from-teal-900/10 dark:to-emerald-900/5 blur-3xl animate-float-delayed" />
         
         {/* Subtle decorative shapes */}
         <div className="absolute top-20 right-1/4 w-3 h-3 rounded-full bg-emerald-400/30 animate-pulse-soft" />
         <div className="absolute bottom-32 left-1/3 w-2 h-2 rounded-full bg-emerald-300/40 animate-pulse-soft" style={{ animationDelay: '1s' }} />
-        <div className="absolute top-1/2 right-16 w-2.5 h-2.5 rounded-full bg-teal-400/25 animate-pulse-soft" style={{ animationDelay: '2s' }} />
+        <div className="absolute top-1/2 right-16 w-2.5 h-2.5 rounded-full bg-terracotta-400/25 animate-pulse-soft" style={{ animationDelay: '2s' }} />
         
         {/* Subtle grid pattern overlay */}
         <div className="absolute inset-0 opacity-[0.015] dark:opacity-[0.03]" style={{
-          backgroundImage: 'radial-gradient(circle, #10b981 1px, transparent 1px)',
+          backgroundImage: 'radial-gradient(circle, #c97c5d 1px, transparent 1px)',
           backgroundSize: '40px 40px',
         }} />
       </div>

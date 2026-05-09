@@ -134,9 +134,9 @@ export default function AdminPanel() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
           { icon: Users, count: allUsers.length, label: t('totalUsers', language), color: 'emerald', gradient: 'from-emerald-500 to-emerald-600' },
-          { icon: Key, count: totalActiveKeys, label: t('activeKeys', language), color: 'emerald', gradient: 'from-teal-500 to-emerald-500' },
+          { icon: Key, count: totalActiveKeys, label: t('activeKeys', language), color: 'emerald', gradient: 'from-emerald-400 to-emerald-600' },
           { icon: Key, count: totalUsedKeys, label: t('usedKeys', language), color: 'orange', gradient: 'from-amber-500 to-orange-500' },
-          { icon: BarChart3, count: allListsCount, label: t('totalLists', language), color: 'blue', gradient: 'from-emerald-400 to-teal-500' },
+          { icon: BarChart3, count: allListsCount, label: t('totalLists', language), color: 'blue', gradient: 'from-emerald-300 to-emerald-500' },
         ].map((stat, index) => (
           <motion.div
             key={stat.label}
