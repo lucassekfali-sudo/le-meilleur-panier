@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStore } from '@/lib/useStore';
 import { t, Language } from '@/lib/translations';
+import { COUNTRIES } from '@/lib/countries';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -20,7 +21,7 @@ export default function LoginPage() {
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [accessKey, setAccessKey] = useState('');
+  const [country, setCountry] = useState<string>('fr');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
@@ -59,7 +60,7 @@ export default function LoginPage() {
           setLoading(false);
           return;
         }
-        const result = await signup(email, name, password, accessKey);
+        const result = await signup(email, name, password, '', country);
         if (result) {
           setSuccess(t('signupSuccess', language));
         } else {
@@ -343,7 +344,7 @@ export default function LoginPage() {
                   )}
                 </AnimatePresence>
 
-                {/* Access Key - signup only */}
+                {/* Country - signup only */}
                 <AnimatePresence>
                   {mode === 'signup' && (
                     <motion.div
@@ -352,25 +353,30 @@ export default function LoginPage() {
                       exit={{ opacity: 0, height: 0 }}
                       className="space-y-1.5"
                     >
-                      <Label htmlFor="accessKey" className="text-sm font-medium text-foreground/80">
-                        {t('accessKey', language)}
+                      <Label htmlFor="country" className="text-sm font-medium text-foreground/80">
+                        {t('country', language)}
                       </Label>
                       <div className="relative">
-                        <Input
-                          id="accessKey"
-                          type="text"
-                          placeholder="XXXXXXXXX"
-                          value={accessKey}
-                          onChange={(e) => setAccessKey(e.target.value.toUpperCase())}
+                        <select
+                          id="country"
+                          value={country}
+                          onChange={(e) => setCountry(e.target.value)}
                           required
-                          className="border-emerald-200/60 dark:border-emerald-800/40 focus-visible:ring-emerald-500/50 bg-white/50 dark:bg-gray-800/50 rounded-xl h-11 pl-10 font-mono tracking-wider transition-all duration-300 focus:bg-white dark:focus:bg-gray-800"
-                          maxLength={10}
-                        />
-                        <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50" />
+                          className="w-full border border-emerald-200/60 dark:border-emerald-800/40 focus-visible:ring-emerald-500/50 bg-white/50 dark:bg-gray-800/50 rounded-xl h-11 pl-10 pr-4 text-sm transition-all duration-300 focus:bg-white dark:focus:bg-gray-800 focus:outline-none focus:ring-2"
+                        >
+                          {COUNTRIES.map((c) => (
+                            <option key={c.code} value={c.code}>
+                              {c.flag}  {c.name[language as 'fr' | 'en' | 'es']} — {c.currency}
+                            </option>
+                          ))}
+                        </select>
+                        <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50 pointer-events-none" />
                       </div>
                     </motion.div>
                   )}
                 </AnimatePresence>
+
+                {/* Access keys removed — signup is now open to anyone */}
 
                 {/* Error/Success Messages */}
                 <AnimatePresence>

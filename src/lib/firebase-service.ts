@@ -25,6 +25,8 @@ export interface UserData {
   /** Legacy plaintext field — only present on accounts not yet migrated. */
   password?: string;
   language: string;
+  /** ISO 3166-1 alpha-2 country code — drives currency + locale */
+  country?: string;
   createdAt: string;
   lastLogin: string;
   accessKey?: string;
@@ -166,16 +168,18 @@ export async function createUserWithHash(
   email: string,
   name: string,
   passwordHash: string,
-  accessKey: string
+  accessKey: string,
+  meta?: { country?: string; language?: string }
 ): Promise<UserData | null> {
-  return createUserInternal(email, name, accessKey, { passwordHash });
+  return createUserInternal(email, name, accessKey, { passwordHash }, meta);
 }
 
 async function createUserInternal(
   email: string,
   name: string,
   accessKey: string,
-  pw: { password?: string; passwordHash?: string }
+  pw: { password?: string; passwordHash?: string },
+  meta?: { country?: string; language?: string }
 ): Promise<UserData | null> {
   const firestore = getDb();
   if (!firestore) return null;
@@ -194,7 +198,8 @@ async function createUserInternal(
       name,
       ...(pw.passwordHash ? { passwordHash: pw.passwordHash } : {}),
       ...(pw.password ? { password: pw.password } : {}),
-      language: 'fr',
+      language: meta?.language || 'fr',
+      ...(meta?.country ? { country: meta.country } : {}),
       createdAt: new Date().toISOString(),
       lastLogin: new Date().toISOString(),
       accessKey,

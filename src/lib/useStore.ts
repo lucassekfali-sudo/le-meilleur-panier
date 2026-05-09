@@ -26,6 +26,8 @@ export interface AppUser {
   email: string;
   name: string;
   language: string;
+  /** ISO 3166-1 alpha-2 country code — defaults to 'fr' if missing */
+  country?: string;
   createdAt: string;
   lastLogin: string;
   accessKey?: string;
@@ -104,7 +106,8 @@ interface AppActions {
     email: string,
     name: string,
     password: string,
-    accessKey: string
+    accessKey: string,
+    country?: string
   ) => Promise<boolean>;
   /** Kept for backwards compatibility — admin login flows through the same /api/auth route. */
   adminLogin: (email: string, code: string) => Promise<boolean>;
@@ -269,9 +272,27 @@ export const useStore = create<AppState & AppActions>()(
         return true;
       },
 
-      signup: async (email, name, password, accessKey) => {
+      signup: async (email, name, password, accessKey, country) => {
         set({ authError: null });
-        const data = await callAuth({ action: 'signup', email, name, password, accessKey });
+        // Lookup the country to also send the matching default language
+        let language: string | undefined;
+        if (country) {
+          try {
+            const { getCountry } = await import('./countries');
+            language = getCountry(country).language;
+          } catch {
+            language = undefined;
+          }
+        }
+        const data = await callAuth({
+          action: 'signup',
+          email,
+          name,
+          password,
+          accessKey,
+          country,
+          language,
+        });
         if (data.error || !data.user) {
           set({ authError: data.error ?? 'Échec de la création du compte' });
           return false;
@@ -280,6 +301,8 @@ export const useStore = create<AppState & AppActions>()(
           user: data.user,
           isAdmin: false,
           showTutorial: true,
+          // Auto-switch UI language to match the user's country
+          ...(language ? { language: language as Language } : {}),
           accessKeys: data.accessKeys
             ? (data.accessKeys as AppAccessKey[])
             : get().accessKeys,

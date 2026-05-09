@@ -97,6 +97,8 @@ interface AuthBody {
   password?: string;
   name?: string;
   accessKey?: string;
+  country?: string;
+  language?: string;
 }
 
 // ---------- POST handler ----------
@@ -109,7 +111,7 @@ export async function POST(request: NextRequest) {
     return badRequest('Corps de requête invalide');
   }
 
-  const { action, email, password, name, accessKey } = body;
+  const { action, email, password, name, accessKey, country, language } = body;
   const ip = getIp(request);
 
   if (action !== 'login' && action !== 'signup') {
@@ -184,6 +186,7 @@ export async function POST(request: NextRequest) {
         email: fbUser.email,
         name: fbUser.name,
         language: fbUser.language ?? 'fr',
+        country: fbUser.country,
         createdAt: fbUser.createdAt,
         lastLogin: new Date().toISOString(),
         accessKey: fbUser.accessKey,
@@ -193,7 +196,7 @@ export async function POST(request: NextRequest) {
   }
 
   // ===== SIGNUP =====
-  if (!email || !password || !name || !accessKey) {
+  if (!email || !password || !name) {
     return badRequest('Champs requis manquants');
   }
   if (password.length < 6) {
@@ -204,22 +207,22 @@ export async function POST(request: NextRequest) {
   }
 
   const {
-    validateAccessKey,
     getUserByEmail,
     createUserWithHash,
-    getAccessKeys,
   } = await import('@/lib/firebase-service');
 
   if (await getUserByEmail(email)) {
     return badRequest('Email déjà utilisé', 409);
   }
 
-  const keyValid = await validateAccessKey(accessKey);
-  if (!keyValid) {
-    return badRequest("Clé d'accès invalide ou déjà utilisée", 400);
-  }
-
-  const newUser = await createUserWithHash(email, name, hashPassword(password), accessKey);
+  // Access keys removed — signup is now open to anyone with a valid email.
+  const newUser = await createUserWithHash(
+    email,
+    name,
+    hashPassword(password),
+    '', // no access key
+    { country: country?.toLowerCase(), language }
+  );
   if (!newUser) {
     return badRequest('Échec de la création du compte', 500);
   }
@@ -231,6 +234,7 @@ export async function POST(request: NextRequest) {
         email: newUser.email,
         name: newUser.name,
         language: newUser.language ?? 'fr',
+        country: newUser.country,
         createdAt: newUser.createdAt,
         lastLogin: newUser.lastLogin,
         accessKey: newUser.accessKey,
