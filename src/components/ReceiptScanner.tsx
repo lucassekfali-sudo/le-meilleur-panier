@@ -199,34 +199,41 @@ export default function ReceiptScanner({ open, onClose, listId }: ReceiptScanner
     reader.readAsDataURL(file);
 
     try {
-      // Dynamically import tesseract.js
-      const { createWorker } = await import('tesseract.js');
+      setProgressStatus('Sending to AI...');
+      setProgress(20);
 
-      setProgressStatus('Loading OCR engine...');
-      const worker = await createWorker('fra', 1, {
-        logger: (m: { status?: string; progress?: number }) => {
-          if (m.status === 'recognizing text') {
-            setProgress(Math.round((m.progress || 0) * 100));
-            setProgressStatus('Recognizing text...');
-          } else if (m.status === 'loading language traineddata') {
-            setProgress(Math.round((m.progress || 0) * 50));
-            setProgressStatus('Loading language data...');
-          } else if (m.status) {
-            setProgressStatus(m.status);
-          }
-        },
+      // Use server-side Gemini Vision (free 1500 req/day)
+      const formData = new FormData();
+      formData.append('image', file);
+
+      const res = await fetch('/api/receipts/scan', {
+        method: 'POST',
+        body: formData,
       });
 
-      workerRef.current = worker;
+      setProgress(80);
+      setProgressStatus('Extracting items...');
 
-      const { data: { text } } = await worker.recognize(file);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        console.error('[ReceiptScanner] API error:', err);
+        setOcrError('ocr_failed');
+        setStep('results');
+        return;
+      }
 
-      // Terminate worker after use
-      await worker.terminate();
-      workerRef.current = null;
+      const data = await res.json();
+      setProgress(100);
 
-      // Extract items from OCR text
-      const items = extractItemsFromText(text);
+      // Map AI items to local ExtractedItem shape
+      const items: ExtractedItem[] = (data.items || []).map((it: { name: string; quantity?: number; unitPrice?: number; totalPrice?: number }) => ({
+        id: 'scan_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+        name: it.name || '',
+        quantity: it.quantity || 1,
+        price: it.totalPrice ?? it.unitPrice ?? 0,
+        selected: true,
+      }));
+
       setExtractedItems(items);
       setStep('results');
 
