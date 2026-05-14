@@ -20,6 +20,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Plus, Trash2, Pencil, Save, X, Image as ImageIcon, Search, Sparkles } from 'lucide-react';
+import { getCountry } from '@/lib/countries';
 
 type Draft = Omit<ProductData, 'id' | 'updatedAt'>;
 
@@ -45,6 +46,51 @@ export default function AdminProductsTable() {
   const [filterStore, setFilterStore] = useState<string>('');
   const [seeding, setSeeding] = useState(false);
   const [seedMessage, setSeedMessage] = useState<string | null>(null);
+  const [barcodeInput, setBarcodeInput] = useState('');
+  const [barcodeLoading, setBarcodeLoading] = useState(false);
+  const [barcodeMsg, setBarcodeMsg] = useState<string | null>(null);
+
+  const handleBarcodeLookup = async () => {
+    const code = barcodeInput.trim();
+    if (!/^\d{8,14}$/.test(code)) {
+      setBarcodeMsg('⚠️ Code-barres invalide (8 à 14 chiffres)');
+      setTimeout(() => setBarcodeMsg(null), 3000);
+      return;
+    }
+    setBarcodeLoading(true);
+    setBarcodeMsg(null);
+    try {
+      const res = await fetch('/api/products/lookup-barcode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ barcode: code }),
+      });
+      const data = await res.json();
+      if (!data.found) {
+        setBarcodeMsg('❌ Produit introuvable dans Open Food Facts');
+        setTimeout(() => setBarcodeMsg(null), 4000);
+        return;
+      }
+      // Pre-fill the new-row form with OFF data
+      setNewDraft({
+        ...emptyDraft,
+        name: data.name + (data.quantity ? ` ${data.quantity}` : ''),
+        brand: data.brand || '',
+        category: data.category || '',
+        imageUrl: data.imageUrl || '',
+      });
+      setShowNewRow(true);
+      setBarcodeInput('');
+      setBarcodeMsg(`✅ ${data.name} ajouté au formulaire`);
+      setTimeout(() => setBarcodeMsg(null), 3000);
+    } catch (e) {
+      console.error('[barcode lookup]', e);
+      setBarcodeMsg('❌ Erreur réseau');
+      setTimeout(() => setBarcodeMsg(null), 3000);
+    } finally {
+      setBarcodeLoading(false);
+    }
+  };
 
   const handleSeed = async () => {
     setSeeding(true);
@@ -152,12 +198,15 @@ export default function AdminProductsTable() {
     }
   };
 
-  const fmt = (n: number) =>
-    n.toLocaleString(language === 'en' ? 'en-US' : language === 'es' ? 'es-ES' : 'fr-FR', {
+  const fmt = (n: number) => {
+    const user = useStore.getState().user;
+    const c = getCountry(user?.country);
+    return new Intl.NumberFormat(c.locale, {
       style: 'currency',
-      currency: 'EUR',
+      currency: c.currency,
       minimumFractionDigits: 2,
-    });
+    }).format(n);
+  };
 
   return (
     <div className="space-y-4">
@@ -193,6 +242,35 @@ export default function AdminProductsTable() {
           {seedMessage}
         </div>
       )}
+
+      {/* Barcode quick-add via Open Food Facts */}
+      <Card className="border-terracotta-200/40 dark:border-terracotta-800/30 bg-terracotta-50/30 dark:bg-terracotta-950/10 rounded-xl">
+        <CardContent className="p-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex-1 min-w-[200px] relative">
+              <Input
+                value={barcodeInput}
+                onChange={(e) => setBarcodeInput(e.target.value.replace(/[^0-9]/g, ''))}
+                placeholder="Code-barres (ex: 3017620422003)"
+                onKeyDown={(e) => e.key === 'Enter' && handleBarcodeLookup()}
+                disabled={barcodeLoading}
+                className="rounded-xl font-mono tracking-wider"
+                maxLength={14}
+              />
+            </div>
+            <Button
+              onClick={handleBarcodeLookup}
+              disabled={barcodeLoading || !barcodeInput}
+              className="gradient-emerald text-white rounded-xl"
+            >
+              {barcodeLoading ? '...' : '🔍 Chercher (OFF)'}
+            </Button>
+          </div>
+          {barcodeMsg && (
+            <div className="mt-2 text-sm">{barcodeMsg}</div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Filters */}
       <div className="flex items-center gap-2 flex-wrap">

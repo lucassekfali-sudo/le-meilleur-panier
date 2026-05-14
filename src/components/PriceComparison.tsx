@@ -7,6 +7,7 @@ import { effectivePrice, type ProductData } from '@/lib/firebase-service';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
+import { getCountry } from '@/lib/countries';
 import {
   Dialog,
   DialogContent,
@@ -48,12 +49,15 @@ export default function PriceComparison() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const fmt = (n: number) =>
-    n.toLocaleString(language === 'en' ? 'en-US' : language === 'es' ? 'es-ES' : 'fr-FR', {
+  const fmt = (n: number) => {
+    const user = useStore.getState().user;
+    const c = getCountry(user?.country);
+    return new Intl.NumberFormat(c.locale, {
       style: 'currency',
-      currency: 'EUR',
+      currency: c.currency,
       minimumFractionDigits: 2,
-    });
+    }).format(n);
+  };
 
   const itemResults = useMemo(() => {
     const q = singleQuery.trim().toLowerCase();

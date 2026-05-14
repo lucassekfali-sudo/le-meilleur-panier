@@ -82,12 +82,31 @@ export default function PurchaseHistory() {
     });
   };
 
-  const fmtCurrency = (n: number) =>
-    n.toLocaleString(language === 'en' ? 'en-US' : language === 'es' ? 'es-ES' : 'fr-FR', {
+  const fmtCurrency = (n: number) => {
+    const user = useStore.getState().user;
+    // dynamic-import the country helper to keep this file small
+    const country = user?.country || 'fr';
+    const map: Record<string, { locale: string; currency: string }> = {
+      fr: { locale: 'fr-FR', currency: 'EUR' },
+      be: { locale: 'fr-BE', currency: 'EUR' },
+      ch: { locale: 'fr-CH', currency: 'CHF' },
+      ca: { locale: 'fr-CA', currency: 'CAD' },
+      us: { locale: 'en-US', currency: 'USD' },
+      gb: { locale: 'en-GB', currency: 'GBP' },
+      es: { locale: 'es-ES', currency: 'EUR' },
+      mx: { locale: 'es-MX', currency: 'MXN' },
+      ar: { locale: 'es-AR', currency: 'ARS' },
+      cl: { locale: 'es-CL', currency: 'CLP' },
+      co: { locale: 'es-CO', currency: 'COP' },
+      br: { locale: 'pt-BR', currency: 'BRL' },
+    };
+    const c = map[country] || map.fr;
+    return new Intl.NumberFormat(c.locale, {
       style: 'currency',
-      currency: 'EUR',
+      currency: c.currency,
       minimumFractionDigits: 2,
-    });
+    }).format(n);
+  };
 
   return (
     <div className="space-y-4">

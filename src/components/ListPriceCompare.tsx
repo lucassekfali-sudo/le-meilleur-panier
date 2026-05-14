@@ -8,6 +8,7 @@ import { effectivePrice, type ProductData } from '@/lib/firebase-service';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Trophy, TrendingDown, ChevronDown, AlertCircle } from 'lucide-react';
+import { getCountry } from '@/lib/countries';
 
 function matchesItem(itemName: string, productName: string): boolean {
   const words = itemName.toLowerCase().trim().split(/\s+/).filter(Boolean);
@@ -35,12 +36,15 @@ export default function ListPriceCompare({ list }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const fmt = (n: number) =>
-    n.toLocaleString(language === 'en' ? 'en-US' : language === 'es' ? 'es-ES' : 'fr-FR', {
+  const fmt = (n: number) => {
+    const user = useStore.getState().user;
+    const c = getCountry(user?.country);
+    return new Intl.NumberFormat(c.locale, {
       style: 'currency',
-      currency: 'EUR',
+      currency: c.currency,
       minimumFractionDigits: 2,
-    });
+    }).format(n);
+  };
 
   const stores = useMemo(() => {
     const s = new Set<string>();
