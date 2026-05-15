@@ -430,7 +430,14 @@ export default function ShoppingListPage() {
         {openList.items.length > 0 && openList.items.every((i) => i.checked) && (
           <Button
             onClick={async () => {
-              const ok = await archiveList(openList.id);
+              // Ask the user where they did the shopping so we can crowdsource
+              // the prices into the trust engine.
+              const store = window.prompt(
+                t('whichStore', language) || 'Dans quel magasin as-tu fait ces courses ?',
+                ''
+              );
+              if (store === null) return; // user cancelled
+              const ok = await archiveList(openList.id, store.trim() || undefined);
               if (ok) {
                 setCelebrate({ show: true, message: t('listCompleted', language) });
                 setOpenListId(null);

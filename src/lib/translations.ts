@@ -71,6 +71,7 @@ export const translations: Record<Language, Record<string, string>> = {
 
     // Purchase History
     archiveList: "Terminer les courses — archiver dans l'historique",
+    whichStore: 'Dans quel magasin as-tu fait ces courses ?',
     purchaseHistory: 'Historique des achats',
     totalSpent: 'Total dépensé',
     avgPerTrip: 'Moy. par course',
@@ -407,6 +408,7 @@ export const translations: Record<Language, Record<string, string>> = {
 
     // Purchase History
     archiveList: 'Finish shopping — archive to history',
+    whichStore: 'Which store did you shop at?',
     purchaseHistory: 'Purchase History',
     totalSpent: 'Total spent',
     avgPerTrip: 'Avg. per trip',
@@ -743,6 +745,7 @@ export const translations: Record<Language, Record<string, string>> = {
 
     // Purchase History
     archiveList: 'Finalizar compras — archivar en el historial',
+    whichStore: '¿En qué tienda hiciste estas compras?',
     purchaseHistory: 'Historial de compras',
     totalSpent: 'Total gastado',
     avgPerTrip: 'Prom. por compra',

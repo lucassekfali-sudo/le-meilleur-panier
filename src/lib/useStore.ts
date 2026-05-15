@@ -593,6 +593,40 @@ export const useStore = create<AppState & AppActions>()(
             purchaseHistory: [entry, ...state.purchaseHistory],
           }));
           await fbService.deleteShoppingList(user.id, listId);
+
+          // Crowdsource the prices: each archived item with a price > 0
+          // and a store name feeds the trust engine. Best-effort, never blocks
+          // the archive itself.
+          if (store && store.trim()) {
+            const checked = list.items.filter((i) => i.checked && i.price > 0);
+            for (const item of checked) {
+              // productId is the slugified item name (so multiple users
+              // submitting the same product converge on the same doc).
+              const productId = item.name
+                .toLowerCase()
+                .normalize('NFD')
+                .replace(/[̀-ͯ]/g, '')
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/^-+|-+$/g, '')
+                .slice(0, 80);
+              if (!productId) continue;
+              try {
+                fetch('/api/products/submit-price', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    productId,
+                    store: store.trim(),
+                    price: item.price,
+                    userId: user.id,
+                  }),
+                }).catch(() => {}); // fire & forget
+              } catch {
+                // ignore
+              }
+            }
+          }
+
           return true;
         } catch (e) {
           console.warn('[Store] archiveList error:', e);
