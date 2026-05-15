@@ -13,6 +13,7 @@ import PurchaseHistory from './PurchaseHistory';
 import ListPriceCompare from './ListPriceCompare';
 import Celebration from './Celebration';
 import StatsHeader from './StatsHeader';
+import CatalogSuggestions from './CatalogSuggestions';
 import GoalsPage from './GoalsPage';
 import SharedExpensesPage from './SharedExpensesPage';
 import ReceiptScanner from './ReceiptScanner';
@@ -422,8 +423,26 @@ export default function ShoppingListPage() {
         <Input
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder={t('searchItems', language)}
+          placeholder={t('searchItemsOrCatalog', language) || 'Rechercher dans la liste ou dans le catalogue...'}
           className="border-emerald-200/60 dark:border-emerald-800/40 focus-visible:ring-emerald-500/50 bg-white/60 dark:bg-gray-800/60 rounded-xl h-11 transition-all duration-300 focus:bg-white dark:focus:bg-gray-800"
+        />
+
+        {/* Catalog suggestions — when query matches no list item but matches catalog products */}
+        <CatalogSuggestions
+          query={searchQuery}
+          excludeNames={openList.items.map((i) => i.name.toLowerCase())}
+          onAdd={(prod, price) => {
+            if (!openList) return;
+            addItem(openList.id, {
+              id: 'item_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+              name: prod.name,
+              price,
+              quantity: 1,
+              category: prod.category || 'other',
+              checked: false,
+            });
+            setSearchQuery('');
+          }}
         />
 
         {/* Archive button — appears once every item is checked */}
